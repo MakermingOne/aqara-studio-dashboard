@@ -227,7 +227,7 @@ const METRICS = {
     desc:"按时段累计访问人次",
     cols:["时间段","区域","小时增量（人次）","时段内累计（人次）"] },
   dwell:    { name:"平均驻留时长", unit:"分钟", mode:"snapshot",
-    desc:"当下时刻按公式计算的统计量：Σ(实时人数 × 持续时长) ÷ 当日访问人次，无时间增量概念" },
+    desc:"分当下实时与历史记录：Σ(实时人数 × 持续时长) ÷ 当日访问人次，无时间增量概念" },
   distance: { name:"今日行走距离", unit:"m", mode:"sum", precision:0, hasRegion:false,
     desc:"全区域累计行走距离（不分区域），单位 m，精度 1 m",
     cols:["时间段","小时增量（m）","时段内累计（m）"] },
@@ -532,24 +532,19 @@ function drawRealtime(){
   });
 }
 
-/* ---------- 平均驻留时长详情：当下统计量（无时间段筛选） ---------- */
+/* ---------- 平均驻留时长详情：当下实时 / 历史记录 双 Tab ---------- */
 function renderDwell(){
   const cfg = METRICS.dwell;
   const now = new Date();
   const main = document.getElementById("detailMain");
   main.innerHTML = detailHead(cfg, " · 统计时间 " + fmtHM(now.getHours(), now.getMinutes())) +
-    `<div class="filters">
-       <button class="export-btn" id="exportBtn" style="margin-left:0">导出 Excel</button>
-     </div>
-     <div id="tableWrap"></div>
-     <div class="note">平均驻留时长为当下时刻按公式计算的统计量：Σ(实时人数 × 该实时人数持续时长) ÷ 当日访问人次，无时间增量概念，因此不提供日期与时间段筛选；统计口径为今日截至当前时刻。</div>`;
-  document.getElementById("exportBtn").onclick = () => exportExcel("dwell");
+    `<div id="dwWrap"></div>
+     <div class="note">平均驻留时长 = Σ(实时人数 × 该实时人数持续时长) ÷ 当日访问人次，无时间增量概念。「当下实时」为打开页面时刻的统计值（今日截至当前时刻）；「历史记录」以天为单位，选择日期即可查看对应日期的天级统计。</div>`;
   drawDwell();
 }
 
-function dwellRows(){
-  const key = todayKey();
-  const d = RAW[key].dwell;
+function dwellRows(dateKey){
+  const d = RAW[dateKey].dwell;
   const rows = REGIONS.map(r => ({ rg: r, ...d[r] }));
   const allV = sumArr(rows.map(x => x.visits));
   const allMin = sumArr(rows.map(x => x.personMin));
@@ -558,21 +553,76 @@ function dwellRows(){
 }
 
 function drawDwell(){
-  const rows = dwellRows();
+  const cfg = METRICS.dwell, st = getState("dwell");
+  const wrap = document.getElementById("dwWrap");
   const now = new Date();
+  const isLive = st.tab !== "hist";
+  const dateKey = isLive ? todayKey() : st.date;
+  const isToday = dateKey === todayKey();
+
+  /* Tab */
+  const tabsHtml = `
+    <div class="tabs" id="dwTabs">
+      <button data-tab="live" class="${isLive ? "on" : ""}">当下实时</button>
+      <button data-tab="hist" class="${!isLive ? "on" : ""}">历史记录</button>
+    </div>`;
+
+  /* 筛选区：历史记录提供日期选择 */
+  const minDate = Object.keys(RAW).sort()[0];
+  const filtersHtml = isLive
+    ? `<div class="filters"><button class="export-btn" id="exportBtn" style="margin-left:0">导出 Excel</button></div>`
+    : `<div class="filters">
+         <div class="filter-group">
+           <span class="filter-label">日期</span>
+           <input type="date" id="dwDate" value="${st.date}" min="${minDate}" max="${todayKey()}">
+         </div>
+         <button class="export-btn" id="exportBtn">导出 Excel</button>
+       </div>`;
+
+  if(!RAW[dateKey]){
+    wrap.innerHTML = `${tabsHtml}${filtersHtml}<div class="empty">所选日期暂无数据（演示数据保留最近 7 天）</div>`;
+    bindDwellTabs(st);
+    const d = document.getElementById("dwDate");
+    if(d) d.onchange = e => { st.date = e.target.value; drawDwell(); };
+    document.getElementById("exportBtn").onclick = () => exportExcel("dwell");
+    return;
+  }
+
+  const rows = dwellRows(dateKey);
   const all = rows[rows.length - 1];
-  const summaryHtml = `
+
+  /* 汇总 */
+  const summaryHtml = isLive ? `
     <div class="sum-item"><div class="k">统计日期</div><div class="v" style="font-size:16px">${todayKey()}</div></div>
     <div class="sum-item"><div class="k">统计时间</div><div class="v" style="font-size:16px">${fmtHM(now.getHours(), now.getMinutes())}</div></div>
-    <div class="sum-item"><div class="k">当前平均驻留时长（全区域）</div><div class="v">${all.avg.toFixed(1)}<small>分钟</small></div></div>`;
+    <div class="sum-item"><div class="k">当前平均驻留时长（全区域）</div><div class="v">${all.avg.toFixed(1)}<small>分钟</small></div></div>`
+  : `
+    <div class="sum-item"><div class="k">所选日期</div><div class="v" style="font-size:16px">${dateKey}</div></div>
+    <div class="sum-item"><div class="k">数据口径</div><div class="v" style="font-size:16px">${isToday ? "截至当前时刻" : "完整天"}</div></div>
+    <div class="sum-item"><div class="k">当日平均驻留时长（全区域）</div><div class="v">${all.avg.toFixed(1)}<small>分钟</small></div></div>`;
+
   const body = rows.map(r => `<tr>
       <td>${r.rg}</td>
       <td>${r.visits}</td>
       <td>${r.personMin}</td>
       <td><strong>${r.avg.toFixed(1)}</strong></td></tr>`).join("");
-  document.getElementById("tableWrap").innerHTML = `<div class="summary">${summaryHtml}</div>
-    <table><thead><tr><th>区域</th><th>当日访问人次（人次）</th><th>累计驻留人·时（人·分钟）</th><th>当前平均驻留时长（分钟）</th></tr></thead>
+
+  wrap.innerHTML = `<div class="summary">${summaryHtml}</div>${tabsHtml}${filtersHtml}
+    <table><thead><tr><th>区域</th><th>当日访问人次（人次）</th><th>累计驻留（人·分钟）</th><th>平均驻留时长（分钟）</th></tr></thead>
     <tbody>${body}</tbody></table>`;
+
+  bindDwellTabs(st);
+  const d = document.getElementById("dwDate");
+  if(d) d.onchange = e => { st.date = e.target.value; drawDwell(); };
+  document.getElementById("exportBtn").onclick = () => exportExcel("dwell");
+}
+
+function bindDwellTabs(st){
+  document.getElementById("dwTabs").addEventListener("click", e => {
+    const b = e.target.closest("button"); if(!b) return;
+    st.tab = b.dataset.tab;
+    drawDwell();
+  });
 }
 
 /* ---------- 通用增量详情（访问人次 / 今日行走距离） ---------- */
@@ -672,13 +722,17 @@ function exportExcel(m){
   }
 
   if(m === "dwell"){
-    const rows = dwellRows();
-    const data = [["区域","当日访问人次（人次）","累计驻留人·时（人·分钟）","当前平均驻留时长（分钟）"]];
+    const st = getState("dwell");
+    const isLive = st.tab !== "hist";
+    const dateKey = isLive ? todayKey() : st.date;
+    if(!RAW[dateKey]){ alert("所选日期暂无数据"); return; }
+    const rows = dwellRows(dateKey);
+    const data = [["区域","当日访问人次（人次）","累计驻留（人·分钟）","平均驻留时长（分钟）"]];
     rows.forEach(r => data.push([r.rg, r.visits, r.personMin, r.avg.toFixed(1)]));
     const ws = XLSX.utils.aoa_to_sheet(data);
     ws["!cols"] = [{wch:10},{wch:20},{wch:24},{wch:24}];
     XLSX.utils.book_append_sheet(wb, ws, cfg.name);
-    XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${todayKey()}.xlsx`);
+    XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${dateKey}${isLive ? "_当下实时" : "_历史记录"}.xlsx`);
     return;
   }
 
