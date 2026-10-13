@@ -222,12 +222,13 @@ const RAW = genRaw();
 
 const METRICS = {
   realtime: { name:"实时人数", unit:"人", mode:"realtime",
-    desc:"人数每次变化即上报一条日志（+N / −N），小时区间内统计最高实时人数，单区域上限 10，超出显示 10+" },
+    desc:"实时上报，按小时区间统计最高实时人数，单区域上限 10，超出显示 10+" },
   visits:   { name:"访问人次", unit:"人次", mode:"sum", precision:0, hasRegion:true,
     desc:"按时段累计访问人次",
     cols:["时间段","区域","小时增量（人次）","时段内累计（人次）"] },
-  dwell:    { name:"平均驻留时长", unit:"分钟", mode:"snapshot",
-    desc:"分当下实时与历史记录：Σ(实时人数 × 持续时长) ÷ 当日访问人次，无时间增量概念" },
+  dwell:    { name:"平均驻留时长", unit:"分钟", mode:"snapshot", hasRegion:true,
+    desc:"Σ(实时人数 × 该实时人数持续时长) ÷ 访问人次，按所选日期与时间段计算",
+    cols:["区域","时段访问人次（人次）","时段累计驻留（人·分钟）","平均驻留时长（分钟）"] },
   distance: { name:"今日行走距离", unit:"m", mode:"sum", precision:0, hasRegion:false,
     desc:"全区域累计行走距离（不分区域），单位 m，精度 1 m",
     cols:["时间段","小时增量（m）","时段内累计（m）"] },
@@ -435,14 +436,14 @@ function detailHead(cfg, subExtra){
     </div>`;
 }
 
-/* ---------- 实时人数详情：Tab 切换（小时最高在前，日志在后） ---------- */
+/* ---------- 实时人数详情：实时上报，仅小时最高人数 ---------- */
 function renderRealtime(){
   const cfg = METRICS.realtime, st = getState("realtime");
   const main = document.getElementById("detailMain");
   main.innerHTML = detailHead(cfg) +
     `<div class="filters">${filterBarHTML({hasRegion:true}, st, true)}</div>
      <div id="rtWrap"></div>
-     <div class="note">实时人数为变化上报：每次人数变动即产生一条日志（+N 进入 / −N 离开），无小时增量概念。「小时最高实时人数」为每个小时区间内实时人数的最大值，默认展示；「实时人数变化日志」为每次变化的上报明细，需要核对具体数据时点击切换查看。单区域人数上限 10，超过显示 10+；全区域为各区域之和，不设上限。</div>`;
+     <div class="note">实时人数为实时上报（非增量上报）：设备按当前人数直接上报，无变化日志。「小时最高实时人数」为每个小时区间内实时人数的最大值。单区域人数上限 10，超过显示 10+；全区域为各区域之和，不设上限。当天数据截至当前时刻。</div>`;
   bindFilterEvents("realtime", st, drawRealtime);
   drawRealtime();
 }
@@ -455,18 +456,6 @@ function drawRealtime(){
   const regions = st.region === "全区域" ? REGIONS : [st.region];
   const showCap = st.region !== "全区域"; // 单区域按上限 10 显示；全区域为合计值
   const display = n => showCap ? fmtRT(n) : String(n);
-
-  /* 变化日志行（先算好，两个 Tab 共用计数） */
-  let logRows = [];
-  regions.forEach(rg => {
-    let count = 0;
-    RAW[st.date].realtime[rg].forEach(e => {
-      count = Math.max(0, count + e.delta);
-      if(e.h >= st.from && e.h <= st.to)
-        logRows.push({ t: fmtHM(e.h, e.min), rg, delta: e.delta, after: count });
-    });
-  });
-  logRows.sort((a,b) => a.t.localeCompare(b.t));
 
   /* 小时最高行 */
   let hourRows = [];
@@ -490,139 +479,66 @@ function drawRealtime(){
   const rangePeak = inRange.length ? Math.max(...inRange.map(r => r.max)) : null;
   const now = new Date();
   const summaryHtml = `
-    <div class="sum-item"><div class="k">日期</div><div class="v" style="font-size:16px">${st.date}</div></div>
-    <div class="sum-item"><div class="k">所选时段</div><div class="v" style="font-size:16px">${span}</div></div>
+    <div class="sum-item"><div class="k">所选时段（${st.date}）</div><div class="v" style="font-size:16px">${span}</div></div>
     <div class="sum-item"><div class="k">当前实时人数（${st.date === todayKey() ? fmtHM(now.getHours(), now.getMinutes()) : "末日时刻"}）</div><div class="v">${display(cur)}<small>人</small></div></div>
     ${hasData ? `<div class="sum-item"><div class="k">当日最高实时人数</div><div class="v">${display(todayPeak)}<small>人</small></div></div>` : ""}
     ${rangePeak != null ? `<div class="sum-item"><div class="k">所选时段最高</div><div class="v">${display(rangePeak)}<small>人</small></div></div>` : ""}
     <div class="sum-item"><div class="k">区域</div><div class="v" style="font-size:16px">${st.region}</div></div>`;
 
-  /* Tab：小时最高在前（默认），变化日志在后 */
-  const isHour = st.tab !== "log";
-  const tabsHtml = `
-    <div class="tabs" id="rtTabs">
-      <button data-tab="hour" class="${isHour ? "on" : ""}">小时最高实时人数</button>
-      <button data-tab="log" class="${!isHour ? "on" : ""}">实时人数变化日志<span class="cnt">${logRows.length} 条</span></button>
-    </div>`;
+  const hourBody = hourRows.map(r => `<tr>
+      <td>${r.hour}</td><td>${r.rg}</td>
+      <td><strong>${r.max == null ? "—" : display(r.max)}</strong></td></tr>`).join("");
 
-  let tableHtml;
-  if(isHour){
-    const hourBody = hourRows.map(r => `<tr>
-        <td>${r.hour}</td><td>${r.rg}</td>
-        <td><strong>${r.max == null ? "—" : display(r.max)}</strong></td></tr>`).join("");
-    tableHtml = `<table><thead><tr><th>时间段</th><th>区域</th><th>小时最高实时人数（人）</th></tr></thead>
-      <tbody>${hourBody}</tbody></table>`;
-  }else{
-    const logBody = logRows.length
-      ? logRows.map(r => `<tr>
-          <td>${r.t}</td><td>${r.rg}</td>
-          <td class="delta ${r.delta > 0 ? "up" : "down"}">${r.delta > 0 ? "+" : ""}${r.delta}</td>
-          <td><strong>${display(r.after)}</strong></td></tr>`).join("")
-      : `<tr><td colspan="4" style="text-align:center;color:var(--ink-3)">所选时段内无人数变化记录</td></tr>`;
-    tableHtml = `<table><thead><tr><th>时间</th><th>区域</th><th>人数变化（人）</th><th>变化后人数（人）</th></tr></thead>
-      <tbody>${logBody}</tbody></table>`;
-  }
-
-  wrap.innerHTML = `<div class="summary">${summaryHtml}</div>${tabsHtml}${tableHtml}`;
-
-  document.getElementById("rtTabs").addEventListener("click", e => {
-    const b = e.target.closest("button"); if(!b) return;
-    st.tab = b.dataset.tab;
-    drawRealtime();
-  });
+  wrap.innerHTML = `<div class="summary">${summaryHtml}</div>
+    <table><thead><tr><th>时间段</th><th>区域</th><th>小时最高实时人数（人）</th></tr></thead>
+    <tbody>${hourBody}</tbody></table>`;
 }
 
-/* ---------- 平均驻留时长详情：当下实时 / 历史记录 双 Tab ---------- */
+/* ---------- 平均驻留时长详情：与其他模块统一的筛选（日期 + 时间段 + 区域） ---------- */
+/* 按所选时间段计算：Σ(实时人数 × 持续时长) ÷ 访问人次 */
+function dwellRange(dateKey, region, from, to){
+  const tl = rtTimelines(dateKey)[region]; // 含「全区域」合计曲线
+  const endMin = Math.min(to * 60 + 59, lastDataMinute(dateKey));
+  let personMin = 0;
+  for(let m = from * 60; m <= endMin; m++) personMin += tl[m];
+  const v = series(dateKey, "visits", region);
+  let visits = 0;
+  for(let h = from; h <= to; h++) visits += v[h];
+  return { visits, personMin, avg: visits ? +(personMin / visits).toFixed(1) : 0 };
+}
+
 function renderDwell(){
-  const cfg = METRICS.dwell;
-  const now = new Date();
+  const cfg = METRICS.dwell, st = getState("dwell");
   const main = document.getElementById("detailMain");
-  main.innerHTML = detailHead(cfg, " · 统计时间 " + fmtHM(now.getHours(), now.getMinutes())) +
-    `<div id="dwWrap"></div>
-     <div class="note">平均驻留时长 = Σ(实时人数 × 该实时人数持续时长) ÷ 当日访问人次，无时间增量概念。「当下实时」为打开页面时刻的统计值（今日截至当前时刻）；「历史记录」以天为单位，选择日期即可查看对应日期的天级统计。</div>`;
+  main.innerHTML = detailHead(cfg, " · 按所选日期与时间段计算") +
+    `<div class="filters">${filterBarHTML(cfg, st, true)}</div>
+     <div id="tableWrap"></div>
+     <div class="note">平均驻留时长 = Σ(实时人数 × 该实时人数持续时长) ÷ 访问人次，按所选日期与时间段实时计算；当天数据截至当前时刻。</div>`;
+  bindFilterEvents("dwell", st, drawDwell);
   drawDwell();
-}
-
-function dwellRows(dateKey){
-  const d = RAW[dateKey].dwell;
-  const rows = REGIONS.map(r => ({ rg: r, ...d[r] }));
-  const allV = sumArr(rows.map(x => x.visits));
-  const allMin = sumArr(rows.map(x => x.personMin));
-  rows.push({ rg: "全区域", visits: allV, personMin: allMin, avg: allV ? +(allMin / allV).toFixed(1) : 0 });
-  return rows;
 }
 
 function drawDwell(){
   const cfg = METRICS.dwell, st = getState("dwell");
-  const wrap = document.getElementById("dwWrap");
-  const now = new Date();
-  const isLive = st.tab !== "hist";
-  const dateKey = isLive ? todayKey() : st.date;
-  const isToday = dateKey === todayKey();
-
-  /* Tab */
-  const tabsHtml = `
-    <div class="tabs" id="dwTabs">
-      <button data-tab="live" class="${isLive ? "on" : ""}">当下实时</button>
-      <button data-tab="hist" class="${!isLive ? "on" : ""}">历史记录</button>
-    </div>`;
-
-  /* 筛选区：历史记录提供日期选择 */
-  const minDate = Object.keys(RAW).sort()[0];
-  const filtersHtml = isLive
-    ? `<div class="filters"><button class="export-btn" id="exportBtn" style="margin-left:0">导出 Excel</button></div>`
-    : `<div class="filters">
-         <div class="filter-group">
-           <span class="filter-label">日期</span>
-           <input type="date" id="dwDate" value="${st.date}" min="${minDate}" max="${todayKey()}">
-         </div>
-         <button class="export-btn" id="exportBtn">导出 Excel</button>
-       </div>`;
-
-  if(!RAW[dateKey]){
-    wrap.innerHTML = `${tabsHtml}${filtersHtml}<div class="empty">所选日期暂无数据（演示数据保留最近 7 天）</div>`;
-    bindDwellTabs(st);
-    const d = document.getElementById("dwDate");
-    if(d) d.onchange = e => { st.date = e.target.value; drawDwell(); };
-    document.getElementById("exportBtn").onclick = () => exportExcel("dwell");
-    return;
-  }
-
-  const rows = dwellRows(dateKey);
+  const wrap = document.getElementById("tableWrap");
+  if(!RAW[st.date]){ wrap.innerHTML = `<div class="empty">所选日期暂无数据</div>`; return; }
+  const regions = st.region === "全区域" ? [...REGIONS, "全区域"] : [st.region];
+  const rows = regions.map(rg => ({ rg, ...dwellRange(st.date, rg, st.from, st.to) }));
   const all = rows[rows.length - 1];
-
-  /* 汇总 */
-  const summaryHtml = isLive ? `
-    <div class="sum-item"><div class="k">统计日期</div><div class="v" style="font-size:16px">${todayKey()}</div></div>
-    <div class="sum-item"><div class="k">统计时间</div><div class="v" style="font-size:16px">${fmtHM(now.getHours(), now.getMinutes())}</div></div>
-    <div class="sum-item"><div class="k">当前平均驻留时长（全区域）</div><div class="v">${all.avg.toFixed(1)}<small>分钟</small></div></div>`
-  : `
-    <div class="sum-item"><div class="k">所选日期</div><div class="v" style="font-size:16px">${dateKey}</div></div>
-    <div class="sum-item"><div class="k">数据口径</div><div class="v" style="font-size:16px">${isToday ? "截至当前时刻" : "完整天"}</div></div>
-    <div class="sum-item"><div class="k">当日平均驻留时长（全区域）</div><div class="v">${all.avg.toFixed(1)}<small>分钟</small></div></div>`;
-
+  const span = `${String(st.from).padStart(2,"0")}:00 – ${String(st.to).padStart(2,"0")}:59`;
+  const summaryHtml = `
+    <div class="sum-item"><div class="k">所选时段（${st.date}）</div><div class="v" style="font-size:16px">${span}</div></div>
+    <div class="sum-item"><div class="k">时段访问人次（${st.region}）</div><div class="v">${all.visits}<small>人次</small></div></div>
+    <div class="sum-item"><div class="k">时段累计驻留（${st.region}）</div><div class="v">${all.personMin}<small>人·分钟</small></div></div>
+    <div class="sum-item"><div class="k">平均驻留时长（${st.region}）</div><div class="v">${all.avg.toFixed(1)}<small>分钟</small></div></div>`;
   const body = rows.map(r => `<tr>
       <td>${r.rg}</td>
       <td>${r.visits}</td>
       <td>${r.personMin}</td>
       <td><strong>${r.avg.toFixed(1)}</strong></td></tr>`).join("");
-
-  wrap.innerHTML = `<div class="summary">${summaryHtml}</div>${tabsHtml}${filtersHtml}
-    <table><thead><tr><th>区域</th><th>当日访问人次（人次）</th><th>累计驻留（人·分钟）</th><th>平均驻留时长（分钟）</th></tr></thead>
+  wrap.innerHTML = `<div class="summary">${summaryHtml}</div>
+    <table><thead><tr>${cfg.cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead>
     <tbody>${body}</tbody></table>`;
-
-  bindDwellTabs(st);
-  const d = document.getElementById("dwDate");
-  if(d) d.onchange = e => { st.date = e.target.value; drawDwell(); };
-  document.getElementById("exportBtn").onclick = () => exportExcel("dwell");
-}
-
-function bindDwellTabs(st){
-  document.getElementById("dwTabs").addEventListener("click", e => {
-    const b = e.target.closest("button"); if(!b) return;
-    st.tab = b.dataset.tab;
-    drawDwell();
-  });
 }
 
 /* ---------- 通用增量详情（访问人次 / 今日行走距离） ---------- */
@@ -693,7 +609,7 @@ function exportExcel(m){
     const regions = st.region === "全区域" ? REGIONS : [st.region];
     const showCap = st.region !== "全区域";
     const display = n => showCap ? fmtRT(n) : String(n);
-    /* sheet 1：小时最高人数 */
+    /* sheet：小时最高人数 */
     const hourRows = [];
     regions.forEach(rg => {
       for(let h = st.from; h <= st.to; h++)
@@ -703,36 +619,21 @@ function exportExcel(m){
     const ws1 = XLSX.utils.aoa_to_sheet([["时间段","区域","小时最高实时人数（人）"], ...hourRows]);
     ws1["!cols"] = [{wch:18},{wch:10},{wch:20}];
     XLSX.utils.book_append_sheet(wb, ws1, "小时最高人数");
-    /* sheet 2：变化日志 */
-    let logRows = [];
-    regions.forEach(rg => {
-      let count = 0;
-      RAW[st.date].realtime[rg].forEach(e => {
-        count = Math.max(0, count + e.delta);
-        if(e.h >= st.from && e.h <= st.to)
-          logRows.push([fmtHM(e.h, e.min), rg, (e.delta > 0 ? "+" : "") + e.delta, display(count)]);
-      });
-    });
-    logRows.sort((a,b) => a[0].localeCompare(b[0]));
-    const ws2 = XLSX.utils.aoa_to_sheet([["时间","区域","人数变化（人）","变化后人数（人）"], ...logRows]);
-    ws2["!cols"] = [{wch:10},{wch:10},{wch:14},{wch:16}];
-    XLSX.utils.book_append_sheet(wb, ws2, "变化日志");
     XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${st.date}_${String(st.from).padStart(2,"0")}-${String(st.to).padStart(2,"0")}时_${st.region}.xlsx`);
     return;
   }
 
   if(m === "dwell"){
     const st = getState("dwell");
-    const isLive = st.tab !== "hist";
-    const dateKey = isLive ? todayKey() : st.date;
-    if(!RAW[dateKey]){ alert("所选日期暂无数据"); return; }
-    const rows = dwellRows(dateKey);
-    const data = [["区域","当日访问人次（人次）","累计驻留（人·分钟）","平均驻留时长（分钟）"]];
+    if(!RAW[st.date]){ alert("所选日期暂无数据"); return; }
+    const regions = st.region === "全区域" ? [...REGIONS, "全区域"] : [st.region];
+    const rows = regions.map(rg => ({ rg, ...dwellRange(st.date, rg, st.from, st.to) }));
+    const data = [cfg.cols];
     rows.forEach(r => data.push([r.rg, r.visits, r.personMin, r.avg.toFixed(1)]));
     const ws = XLSX.utils.aoa_to_sheet(data);
-    ws["!cols"] = [{wch:10},{wch:20},{wch:24},{wch:24}];
+    ws["!cols"] = [{wch:10},{wch:22},{wch:26},{wch:22}];
     XLSX.utils.book_append_sheet(wb, ws, cfg.name);
-    XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${dateKey}${isLive ? "_当下实时" : "_历史记录"}.xlsx`);
+    XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${st.date}_${String(st.from).padStart(2,"0")}-${String(st.to).padStart(2,"0")}时_${st.region}.xlsx`);
     return;
   }
 
