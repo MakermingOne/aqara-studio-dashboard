@@ -82,7 +82,7 @@
   .filter-group{display:flex;flex-direction:column;gap:8px;}
   .filter-label{font-size:12px;color:var(--ink-3);}
   .seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);}
-  .seg button{padding:6px 14px;font-size:13px;color:var(--ink-2);border-right:1px solid var(--line);transition:background .12s,color .12s;background:#fff;}
+  .seg button{padding:6px 12px;font-size:13px;color:var(--ink-2);border-right:1px solid var(--line);transition:background .12s,color .12s;background:#fff;}
   .seg button:last-child{border-right:none;}
   .seg button:hover{background:var(--hover);}
   .seg button.on{background:var(--accent);color:#fff;}
@@ -106,8 +106,6 @@
   td:first-child{color:var(--ink-2);}
   tbody tr:hover{background:var(--hover);}
   .delta{color:var(--ink-2);}
-  .delta.up{color:#0a7d4f;}
-  .delta.down{color:#b3362a;}
   .note{margin-top:14px;color:var(--ink-3);font-size:12px;}
   .empty{padding:48px 0;text-align:center;color:var(--ink-3);}
 
@@ -132,22 +130,26 @@
 
 <script>
 /* =========================================================
- * 模拟设备上报数据
- *  - realtime：变化上报日志，每次人数变动一条 {h, min, delta}
- *  - visits / distance：小时增量序列
- *  - dwell：当下时刻按公式计算的统计量（非时间增量）
- *    公式：Σ(实时人数 × 该实时人数持续时长) ÷ 当日访问人次
+ * 模拟设备上报数据（智能家居空间尺度）
+ *  - realtime：实时变化上报，每次上报为当下实时人数准确值（演示数据以变化事件存储）
+ *  - visits / distance：半小时粒度增量序列
+ *  - dwell：Σ(实时人数 × 持续时长) ÷ 访问人次
  * 真实环境中由后端接口提供，此处生成演示数据
  * ========================================================= */
 const REGIONS = Array.from({length:8}, (_,i) => `区域 ${i+1}`); // 8 个自定义区域
 const HOURS = 24;
-const RT_CAP = 10; // 单区域实时人数上限，超过显示 10+
+const SLOTS = 48; // 半小时粒度
+const RT_CAP = 10; // 侦测能力上限 10 人，超过显示 10+，任何展示都不会大于 10
 
 function seededRand(seed){
   let s = seed;
   return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
 }
-const rand = seededRand(20261012);
+const rand = seededRand(20261013);
+
+function dayFactor(h){ // h 可为小数（半小时槽取半值）
+  return Math.exp(-Math.pow(h - 14, 2) / 40) + Math.exp(-Math.pow(h - 10, 2) / 18) * .6;
+}
 
 function genRaw(){
   const days = 7; // 最近 7 天
@@ -161,38 +163,37 @@ function genRaw(){
     const endH = isToday ? nowH : 23;      // 今日只生成到当前时刻
     const endM = isToday ? nowM : 59;
     const lastMin = endH * 60 + endM;      // 数据覆盖到的最后一分钟
-    data[key] = { realtime:{}, visits:{}, dwell:{}, distance:new Array(HOURS).fill(0) };
+    data[key] = { realtime:{}, visits:{}, dwell:{}, distance:new Array(SLOTS).fill(0) };
 
     REGIONS.forEach((r, ri) => {
-      /* 实时人数：变化上报日志（每次人数变动一条，+N / -N） */
+      /* 实时人数：实时变化上报，每次上报为当下实时人数准确值 */
       const events = [];
       let count = 0;
       for(let h = 0; h <= endH; h++){
         const maxMin = (h === endH) ? endM : 59;
-        const nEv = Math.floor(rand() * 4); // 每小时 0-3 次变化
+        const nEv = Math.floor(rand() * 3); // 每小时 0-2 次上报（家庭活动尺度）
         for(let i = 0; i < nEv; i++){
           const min = Math.floor(rand() * (maxMin + 1));
           let delta;
-          if(count === 0 || rand() < 0.6) delta = 1 + Math.floor(rand() * 3);   // +1..+3 进入
-          else delta = -(1 + Math.floor(rand() * 2));                            // -1..-2 离开
+          const pIn = count === 0 ? 1 : (count < 8 ? 0.6 : 0.2); // 高人数时偏向离开
+          if(rand() < pIn) delta = rand() < 0.3 ? 2 : 1;         // +1 / +2
+          else delta = -(1 + Math.floor(rand() * 2));            // -1 / -2
           count = Math.max(0, count + delta);
           events.push({ h, min, delta });
         }
       }
       data[key].realtime[r] = events;
 
-      /* 访问人次：小时增量 */
-      const visitsArr = new Array(HOURS).fill(0);
-      for(let h = 0; h < HOURS; h++){
-        const dayFactor = Math.exp(-Math.pow(h - 14, 2) / 40) + Math.exp(-Math.pow(h - 10, 2) / 18) * .6;
-        if(h <= endH) visitsArr[h] = Math.round(dayFactor * 40 * (ri + 1) * (0.5 + rand()));
+      /* 访问人次：半小时粒度增量（家庭尺度：每区域每天数十人次） */
+      const visitsArr = new Array(SLOTS).fill(0);
+      for(let s = 0; s < SLOTS; s++){
+        if(s * 30 <= lastMin)
+          visitsArr[s] = Math.round(dayFactor(s / 2) * (ri + 1) * (0.5 + rand()));
       }
       data[key].visits[r] = visitsArr;
       const totalVisits = sumArr(visitsArr);
 
-      /* 平均驻留时长：当下时刻按公式的统计量
-         公式：Σ(实时人数 × 该实时人数持续时长) ÷ 当日访问人次
-         即对分钟级人数曲线下面积（人·分钟）除以访问人次 */
+      /* 平均驻留时长公式：Σ(实时人数 × 该实时人数持续时长) ÷ 访问人次 */
       const ev = [...events].sort((a,b) => (a.h*60 + a.min) - (b.h*60 + b.min));
       let dwellMin = 0, cur = 0, prevT = 0;
       ev.forEach(e => {
@@ -204,16 +205,15 @@ function genRaw(){
       dwellMin += cur * (lastMin + 1 - prevT);
       data[key].dwell[r] = {
         visits: totalVisits,
-        totalMin: Math.round(dwellMin),
         personMin: Math.round(dwellMin),
         avg: totalVisits ? +(dwellMin / totalVisits).toFixed(1) : 0
       };
     });
 
-    /* 今日行走距离：全区域，单位 m，精度 1 m（整数） */
-    for(let h = 0; h < HOURS; h++){
-      const dayFactor = Math.exp(-Math.pow(h - 14, 2) / 40) + Math.exp(-Math.pow(h - 10, 2) / 18) * .6;
-      if(h <= endH) data[key].distance[h] = Math.round(dayFactor * 300 * (0.5 + rand()));
+    /* 今日行走距离：全区域，单位 m，精度 1 m（单人全天室内 ≤ 1000 m） */
+    for(let s = 0; s < SLOTS; s++){
+      if(s * 30 <= lastMin)
+        data[key].distance[s] = Math.round(dayFactor(s / 2) * 40 * (0.5 + rand()));
     }
   }
   return data;
@@ -222,16 +222,16 @@ const RAW = genRaw();
 
 const METRICS = {
   realtime: { name:"实时人数", unit:"人", mode:"realtime",
-    desc:"实时上报，按小时区间统计最高实时人数，单区域上限 10，超出显示 10+" },
+    desc:"实时变化上报，历史数据为每次上报的实时人数准确值；小时区间内统计最高值，侦测上限 10 人，超过显示 10+" },
   visits:   { name:"访问人次", unit:"人次", mode:"sum", precision:0, hasRegion:true,
     desc:"按时段累计访问人次",
-    cols:["时间段","区域","小时增量（人次）","时段内累计（人次）"] },
+    cols:["时间段","区域","时间段增量（人次）","时段内累计（人次）"] },
   dwell:    { name:"平均驻留时长", unit:"分钟", mode:"snapshot", hasRegion:true,
     desc:"Σ(实时人数 × 该实时人数持续时长) ÷ 访问人次，按所选日期与时间段计算",
     cols:["区域","时段访问人次（人次）","时段累计驻留（人·分钟）","平均驻留时长（分钟）"] },
   distance: { name:"今日行走距离", unit:"m", mode:"sum", precision:0, hasRegion:false,
     desc:"全区域累计行走距离（不分区域），单位 m，精度 1 m",
-    cols:["时间段","小时增量（m）","时段内累计（m）"] },
+    cols:["时间段","时间段增量（m）","时段内累计（m）"] },
 };
 
 /* ---------- 工具 ---------- */
@@ -239,26 +239,32 @@ function fmtDate(d){
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
 }
 function fmtHM(h, m){ return String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0"); }
+/* 半小时槽 → "HH:MM"（s 范围 0..47） */
+function fmtSlot(s){ return fmtHM((s / 2) | 0, (s % 2) * 30); }
+/* 槽位区间标签：s 到 s+1（48 显示 24:00） */
+function slotLabel(s){ return `${fmtSlot(s)} – ${s + 1 >= SLOTS ? "24:00" : fmtSlot(s + 1)}`; }
+/* 区间终点标签（to 为排他的槽位，48 显示 24:00） */
+function spanLabel(from, to){ return `${fmtSlot(from)} – ${to >= SLOTS ? "24:00" : fmtSlot(to)}`; }
 function sumArr(a){ return a.reduce((s,x)=>s+x,0); }
 function todayKey(){ return fmtDate(new Date()); }
-/* 单区域实时人数显示：上限 10，超过显示 10+ */
+/* 实时人数显示：侦测上限 10，任何展示都不会大于 10 */
 function fmtRT(n){ return n > RT_CAP ? "10+" : String(n); }
 /* 通用数字格式化 */
 function fmtNum(v, precision){ return (+v).toFixed(precision == null ? 0 : precision); }
 
-/* 访问人次 / 行走距离的小时增量序列 */
+/* 访问人次 / 行走距离的半小时增量序列 */
 function series(dateKey, metric, region){
-  const day = RAW[dateKey]; if(!day) return new Array(HOURS).fill(0);
+  const day = RAW[dateKey]; if(!day) return new Array(SLOTS).fill(0);
   if(metric === "distance") return day.distance;
   if(region === "全区域"){
-    const out = new Array(HOURS).fill(0);
+    const out = new Array(SLOTS).fill(0);
     REGIONS.forEach(r => day[metric][r].forEach((v,i)=> out[i]+=v));
     return out;
   }
   return day[metric][region];
 }
 
-/* ---------- 实时人数：由变化日志重建分钟级人数曲线 ---------- */
+/* ---------- 实时人数：由上报事件重建分钟级人数曲线 ---------- */
 const tlCache = {};
 function rtTimelines(dateKey){
   if(tlCache[dateKey]) return tlCache[dateKey];
@@ -285,17 +291,17 @@ function lastDataMinute(dateKey){
   const now = new Date();
   return dateKey === todayKey() ? now.getHours() * 60 + now.getMinutes() : 24 * 60 - 1;
 }
-/* 某小时是否已有数据 */
-function hourHasData(dateKey, h){ return h * 60 + 59 <= lastDataMinute(dateKey); }
 /* 当前实时人数 */
 function rtCurrent(dateKey, region){
   const tl = rtTimelines(dateKey)[region];
   return tl[lastDataMinute(dateKey)];
 }
-/* 小时最高实时人数 */
-function rtHourMax(dateKey, region, h){
+/* 任意分钟区间最高实时人数 [startMin, endMin) */
+function rtRangeMax(dateKey, region, startMin, endMin){
   const tl = rtTimelines(dateKey)[region];
-  return Math.max(...tl.slice(h * 60, h * 60 + 60));
+  let mx = 0;
+  for(let m = startMin; m < endMin; m++) if(tl[m] > mx) mx = tl[m];
+  return mx;
 }
 
 /* =========================================================
@@ -308,7 +314,7 @@ document.getElementById("headerDate").textContent =
 
 const state = {}; // 每个模块的筛选状态
 function getState(m){
-  if(!state[m]) state[m] = { date: todayKey(), from: 0, to: 23, region: "全区域", tab: "hour" };
+  if(!state[m]) state[m] = { date: todayKey(), from: 0, to: SLOTS, region: "全区域", tab: "hour" };
   return state[m];
 }
 
@@ -328,7 +334,7 @@ function renderHome(){
   const cards = Object.entries(METRICS).map(([k, cfg], i) => {
     let val, meta, isLive = false;
     if(cfg.mode === "realtime"){
-      val = rtCurrent(key, "全区域"); meta = `此刻 ${nowStr} · 全区域`; isLive = true;
+      val = fmtRT(rtCurrent(key, "全区域")); meta = `此刻 ${nowStr} · 全区域`; isLive = true;
     }else if(cfg.mode === "snapshot"){
       const d = RAW[key].dwell;
       const allV = sumArr(REGIONS.map(r => d[r].visits));
@@ -355,7 +361,7 @@ function renderHome(){
   }).join("");
   app.innerHTML = `
     <div class="page-title">数据统计</div>
-    <div class="page-sub">设备按增量实时上报 · 实时人数按变化上报并取小时最高值 · 平均驻留时长为当下统计量 · 点击卡片查看明细与导出</div>
+    <div class="page-sub">智能家居空间尺度 · 实时人数侦测上限 10 人 · 设备按半小时粒度上报 · 点击卡片查看明细与导出</div>
     <div class="cards">${cards}</div>
     <div class="note">第二阶段将加入趋势图表，当前为数据框架与表格演示。</div>`;
 }
@@ -383,10 +389,12 @@ function renderDetail(m){
   renderGeneric(m);
 }
 
-/* 通用筛选条（日期 + 时间段 + 区域） */
-function filterBarHTML(cfg, st, withTimeRange){
-  const hourOpts = v => Array.from({length:HOURS},(_,h)=>
-    `<option value="${h}" ${h===v?"selected":""}>${String(h).padStart(2,"0")}:00</option>`).join("");
+/* 通用筛选条（日期 + 半小时粒度时间段 + 区域） */
+function filterBarHTML(cfg, st){
+  const fromOpts = Array.from({length:SLOTS},(_,s)=>
+    `<option value="${s}" ${s===st.from?"selected":""}>${fmtSlot(s)}</option>`).join("");
+  const toOpts = Array.from({length:SLOTS},(_,i)=>{ const s = i + 1;
+    return `<option value="${s}" ${s===st.to?"selected":""}>${s>=SLOTS?"24:00":fmtSlot(s)}</option>`; }).join("");
   const regionSeg = cfg.hasRegion ? `
     <div class="filter-group">
       <span class="filter-label">区域</span>
@@ -400,23 +408,22 @@ function filterBarHTML(cfg, st, withTimeRange){
       <span class="filter-label">日期</span>
       <input type="date" id="fDate" value="${st.date}">
     </div>
-    ${withTimeRange ? `
     <div class="filter-group">
-      <span class="filter-label">时间段</span>
+      <span class="filter-label">时间段（半小时粒度）</span>
       <div class="time-range">
-        <select id="fFrom">${hourOpts(st.from)}</select>
+        <select id="fFrom">${fromOpts}</select>
         <span style="color:var(--ink-3)">至</span>
-        <select id="fTo">${hourOpts(st.to)}</select>
+        <select id="fTo">${toOpts}</select>
       </div>
-    </div>` : ""}
+    </div>
     ${regionSeg}
     <button class="export-btn" id="exportBtn">导出 Excel</button>`;
 }
 function bindFilterEvents(m, st, redraw){
   document.getElementById("fDate").onchange = e => { st.date = e.target.value; redraw(); };
   const fFrom = document.getElementById("fFrom"), fTo = document.getElementById("fTo");
-  if(fFrom) fFrom.onchange = e => { st.from = +e.target.value; if(st.to < st.from){st.to = st.from; fTo.value = st.to;} redraw(); };
-  if(fTo) fTo.onchange = e => { st.to = +e.target.value; if(st.to < st.from){st.from = st.to; fFrom.value = st.from;} redraw(); };
+  fFrom.onchange = e => { st.from = +e.target.value; if(st.to <= st.from){ st.to = Math.min(st.from + 1, SLOTS); fTo.value = st.to; } redraw(); };
+  fTo.onchange = e => { st.to = +e.target.value; if(st.to <= st.from){ st.from = Math.max(st.to - 1, 0); fFrom.value = st.from; } redraw(); };
   const seg = document.getElementById("regionSeg");
   if(seg) seg.addEventListener("click", e => {
     const b = e.target.closest("button"); if(!b) return;
@@ -436,14 +443,14 @@ function detailHead(cfg, subExtra){
     </div>`;
 }
 
-/* ---------- 实时人数详情：实时上报，仅小时最高人数 ---------- */
+/* ---------- 实时人数详情：小时最高 / 历史数据 双 Tab ---------- */
 function renderRealtime(){
   const cfg = METRICS.realtime, st = getState("realtime");
   const main = document.getElementById("detailMain");
   main.innerHTML = detailHead(cfg) +
-    `<div class="filters">${filterBarHTML({hasRegion:true}, st, true)}</div>
+    `<div class="filters">${filterBarHTML({hasRegion:true}, st)}</div>
      <div id="rtWrap"></div>
-     <div class="note">实时人数为实时上报（非增量上报）：设备按当前人数直接上报，无变化日志。「小时最高实时人数」为每个小时区间内实时人数的最大值。单区域人数上限 10，超过显示 10+；全区域为各区域之和，不设上限。当天数据截至当前时刻。</div>`;
+     <div class="note">实时人数为实时变化上报（非增量）：每次上报的值为当下实时人数准确值。「历史数据」列出每次上报的实时人数；「小时最高实时人数」为每个小时区间内实时人数的最大值。侦测能力上限 10 人，任何数值超过 10 一律显示 10+（含全区域合计与时段最高）。当天数据截至当前时刻。</div>`;
   bindFilterEvents("realtime", st, drawRealtime);
   drawRealtime();
 }
@@ -454,56 +461,89 @@ function drawRealtime(){
   if(!RAW[st.date]){ wrap.innerHTML = `<div class="empty">所选日期暂无数据</div>`; return; }
 
   const regions = st.region === "全区域" ? REGIONS : [st.region];
-  const showCap = st.region !== "全区域"; // 单区域按上限 10 显示；全区域为合计值
-  const display = n => showCap ? fmtRT(n) : String(n);
+  const fromMin = st.from * 30, toMin = Math.min(st.to * 30, 24 * 60);
+  const lastMin = lastDataMinute(st.date);
 
-  /* 小时最高行 */
+  /* 历史数据：每次上报的实时人数准确值 */
+  let histRows = [];
+  regions.forEach(rg => {
+    let count = 0;
+    RAW[st.date].realtime[rg].forEach(e => {
+      count = Math.max(0, count + e.delta);
+      const t = e.h * 60 + e.min;
+      if(t >= fromMin && t < toMin)
+        histRows.push({ t: fmtHM(e.h, e.min), rg, value: count });
+    });
+  });
+  histRows.sort((a,b) => a.t.localeCompare(b.t));
+
+  /* 小时最高：与所选半小时区间重叠的小时，按重叠分钟取最高值 */
   let hourRows = [];
   regions.forEach(rg => {
-    for(let h = st.from; h <= st.to; h++){
-      hourRows.push({ hour: `${String(h).padStart(2,"0")}:00 – ${String(h).padStart(2,"0")}:59`, rg,
-        max: hourHasData(st.date, h) ? rtHourMax(st.date, rg, h) : null });
+    for(let h = 0; h < HOURS; h++){
+      const sMin = Math.max(h * 60, fromMin), eMin = Math.min(h * 60 + 60, toMin);
+      if(sMin >= eMin) continue;
+      hourRows.push({ label: `${fmtHM((sMin/60)|0, sMin%60)} – ${fmtHM(((eMin-1)/60)|0, (eMin-1)%60)}`, rg,
+        max: (eMin - 1) <= lastMin ? rtRangeMax(st.date, rg, sMin, eMin) : null });
     }
   });
 
-  /* 汇总 */
+  /* 汇总（实时人数任何展示均封顶 10+） */
   const cur = rtCurrent(st.date, st.region);
-  let todayPeak = 0, hasData = false;
-  for(let h = 0; h < HOURS; h++){
-    if(!hourHasData(st.date, h)) break;
-    hasData = true;
-    todayPeak = Math.max(todayPeak, rtHourMax(st.date, st.region, h));
-  }
-  const span = `${String(st.from).padStart(2,"0")}:00 – ${String(st.to).padStart(2,"0")}:59`;
-  const inRange = hourRows.filter(r => r.max != null);
-  const rangePeak = inRange.length ? Math.max(...inRange.map(r => r.max)) : null;
+  const todayPeak = rtRangeMax(st.date, st.region, 0, lastMin + 1);
+  const rangePeak = rtRangeMax(st.date, st.region, fromMin, Math.min(toMin, lastMin + 1));
   const now = new Date();
   const summaryHtml = `
-    <div class="sum-item"><div class="k">所选时段（${st.date}）</div><div class="v" style="font-size:16px">${span}</div></div>
-    <div class="sum-item"><div class="k">当前实时人数（${st.date === todayKey() ? fmtHM(now.getHours(), now.getMinutes()) : "末日时刻"}）</div><div class="v">${display(cur)}<small>人</small></div></div>
-    ${hasData ? `<div class="sum-item"><div class="k">当日最高实时人数</div><div class="v">${display(todayPeak)}<small>人</small></div></div>` : ""}
-    ${rangePeak != null ? `<div class="sum-item"><div class="k">所选时段最高</div><div class="v">${display(rangePeak)}<small>人</small></div></div>` : ""}
+    <div class="sum-item"><div class="k">所选时段（${st.date}）</div><div class="v" style="font-size:16px">${spanLabel(st.from, st.to)}</div></div>
+    <div class="sum-item"><div class="k">当前实时人数（${st.date === todayKey() ? fmtHM(now.getHours(), now.getMinutes()) : "末日时刻"}）</div><div class="v">${fmtRT(cur)}<small>人</small></div></div>
+    <div class="sum-item"><div class="k">当日最高实时人数</div><div class="v">${fmtRT(todayPeak)}<small>人</small></div></div>
+    <div class="sum-item"><div class="k">所选时段最高</div><div class="v">${fmtRT(rangePeak)}<small>人</small></div></div>
     <div class="sum-item"><div class="k">区域</div><div class="v" style="font-size:16px">${st.region}</div></div>`;
 
-  const hourBody = hourRows.map(r => `<tr>
-      <td>${r.hour}</td><td>${r.rg}</td>
-      <td><strong>${r.max == null ? "—" : display(r.max)}</strong></td></tr>`).join("");
+  /* Tab：小时最高在前（默认），历史数据在后 */
+  const isHour = st.tab !== "hist";
+  const tabsHtml = `
+    <div class="tabs" id="rtTabs">
+      <button data-tab="hour" class="${isHour ? "on" : ""}">小时最高实时人数</button>
+      <button data-tab="hist" class="${!isHour ? "on" : ""}">历史数据<span class="cnt">${histRows.length} 条上报</span></button>
+    </div>`;
 
-  wrap.innerHTML = `<div class="summary">${summaryHtml}</div>
-    <table><thead><tr><th>时间段</th><th>区域</th><th>小时最高实时人数（人）</th></tr></thead>
-    <tbody>${hourBody}</tbody></table>`;
+  let tableHtml;
+  if(isHour){
+    const hourBody = hourRows.map(r => `<tr>
+        <td>${r.label}</td><td>${r.rg}</td>
+        <td><strong>${r.max == null ? "—" : fmtRT(r.max)}</strong></td></tr>`).join("");
+    tableHtml = `<table><thead><tr><th>时间段</th><th>区域</th><th>小时最高实时人数（人）</th></tr></thead>
+      <tbody>${hourBody}</tbody></table>`;
+  }else{
+    const histBody = histRows.length
+      ? histRows.map(r => `<tr>
+          <td>${r.t}</td><td>${r.rg}</td>
+          <td><strong>${fmtRT(r.value)}</strong></td></tr>`).join("")
+      : `<tr><td colspan="3" style="text-align:center;color:var(--ink-3)">所选时段内无上报记录</td></tr>`;
+    tableHtml = `<table><thead><tr><th>时间</th><th>区域</th><th>实时人数（人）</th></tr></thead>
+      <tbody>${histBody}</tbody></table>`;
+  }
+
+  wrap.innerHTML = `<div class="summary">${summaryHtml}</div>${tabsHtml}${tableHtml}`;
+
+  document.getElementById("rtTabs").addEventListener("click", e => {
+    const b = e.target.closest("button"); if(!b) return;
+    st.tab = b.dataset.tab;
+    drawRealtime();
+  });
 }
 
-/* ---------- 平均驻留时长详情：与其他模块统一的筛选（日期 + 时间段 + 区域） ---------- */
+/* ---------- 平均驻留时长详情：与其他模块统一的筛选 ---------- */
 /* 按所选时间段计算：Σ(实时人数 × 持续时长) ÷ 访问人次 */
 function dwellRange(dateKey, region, from, to){
   const tl = rtTimelines(dateKey)[region]; // 含「全区域」合计曲线
-  const endMin = Math.min(to * 60 + 59, lastDataMinute(dateKey));
+  const endMin = Math.min(to * 30, lastDataMinute(dateKey) + 1);
   let personMin = 0;
-  for(let m = from * 60; m <= endMin; m++) personMin += tl[m];
+  for(let m = from * 30; m < endMin; m++) personMin += tl[m];
   const v = series(dateKey, "visits", region);
   let visits = 0;
-  for(let h = from; h <= to; h++) visits += v[h];
+  for(let s = from; s < to; s++) visits += v[s];
   return { visits, personMin, avg: visits ? +(personMin / visits).toFixed(1) : 0 };
 }
 
@@ -511,7 +551,7 @@ function renderDwell(){
   const cfg = METRICS.dwell, st = getState("dwell");
   const main = document.getElementById("detailMain");
   main.innerHTML = detailHead(cfg, " · 按所选日期与时间段计算") +
-    `<div class="filters">${filterBarHTML(cfg, st, true)}</div>
+    `<div class="filters">${filterBarHTML(cfg, st)}</div>
      <div id="tableWrap"></div>
      <div class="note">平均驻留时长 = Σ(实时人数 × 该实时人数持续时长) ÷ 访问人次，按所选日期与时间段实时计算；当天数据截至当前时刻。</div>`;
   bindFilterEvents("dwell", st, drawDwell);
@@ -525,9 +565,8 @@ function drawDwell(){
   const regions = st.region === "全区域" ? [...REGIONS, "全区域"] : [st.region];
   const rows = regions.map(rg => ({ rg, ...dwellRange(st.date, rg, st.from, st.to) }));
   const all = rows[rows.length - 1];
-  const span = `${String(st.from).padStart(2,"0")}:00 – ${String(st.to).padStart(2,"0")}:59`;
   const summaryHtml = `
-    <div class="sum-item"><div class="k">所选时段（${st.date}）</div><div class="v" style="font-size:16px">${span}</div></div>
+    <div class="sum-item"><div class="k">所选时段（${st.date}）</div><div class="v" style="font-size:16px">${spanLabel(st.from, st.to)}</div></div>
     <div class="sum-item"><div class="k">时段访问人次（${st.region}）</div><div class="v">${all.visits}<small>人次</small></div></div>
     <div class="sum-item"><div class="k">时段累计驻留（${st.region}）</div><div class="v">${all.personMin}<small>人·分钟</small></div></div>
     <div class="sum-item"><div class="k">平均驻留时长（${st.region}）</div><div class="v">${all.avg.toFixed(1)}<small>分钟</small></div></div>`;
@@ -541,14 +580,14 @@ function drawDwell(){
     <tbody>${body}</tbody></table>`;
 }
 
-/* ---------- 通用增量详情（访问人次 / 今日行走距离） ---------- */
+/* ---------- 通用增量详情（访问人次 / 今日行走距离，半小时粒度） ---------- */
 function renderGeneric(m){
   const cfg = METRICS[m], st = getState(m);
   const main = document.getElementById("detailMain");
-  main.innerHTML = detailHead(cfg, " · 按小时粒度") +
-    `<div class="filters">${filterBarHTML(cfg, st, true)}</div>
+  main.innerHTML = detailHead(cfg, " · 按半小时粒度") +
+    `<div class="filters">${filterBarHTML(cfg, st)}</div>
      <div id="tableWrap"></div>
-     <div class="note">设备按增量上报，表格中「小时增量」为设备原始上报值，「时段内累计」为在所选时间段内对增量的累计。</div>`;
+     <div class="note">设备按半小时粒度上报，表格中「时间段增量」为设备原始上报值，「时段内累计」为在所选时间段内对增量的累计。</div>`;
   bindFilterEvents(m, st, () => drawTable(m));
   drawTable(m);
 }
@@ -561,10 +600,10 @@ function buildRows(m){
   regions.forEach(rg => {
     const s = series(st.date, m, rg || "全区域");
     let cum = 0;
-    for(let h = st.from; h <= st.to; h++){
-      const inc = s[h];
+    for(let sl = st.from; sl < st.to; sl++){
+      const inc = s[sl];
       cum += inc;
-      rows.push({ hour: `${String(h).padStart(2,"0")}:00 – ${String(h).padStart(2,"0")}:59`, region: rg,
+      rows.push({ label: slotLabel(sl), region: rg,
         inc: +inc.toFixed(cfg.precision), cum: +cum.toFixed(cfg.precision) });
     }
   });
@@ -579,7 +618,7 @@ function drawTable(m){
 
   const thead = `<tr>${cfg.cols.map(c=>`<th>${c}</th>`).join("")}</tr>`;
   const body = rows.map(r => {
-    let tds = `<td>${r.hour}</td>`;
+    let tds = `<td>${r.label}</td>`;
     if(cfg.hasRegion) tds += `<td>${r.region}</td>`;
     tds += `<td class="delta">+${fmtNum(r.inc, cfg.precision)}</td><td><strong>${fmtNum(r.cum, cfg.precision)}</strong></td>`;
     return `<tr>${tds}</tr>`;
@@ -587,9 +626,8 @@ function drawTable(m){
 
   const totInc = rows.reduce((s,r)=>s + r.inc, 0);
   const lastCum = rows.length ? rows[rows.length-1].cum : 0;
-  const span = `${String(st.from).padStart(2,"0")}:00 – ${String(st.to).padStart(2,"0")}:59`;
   let summaryHtml = `
-    <div class="sum-item"><div class="k">所选时段（${st.date}）</div><div class="v" style="font-size:16px">${span}</div></div>
+    <div class="sum-item"><div class="k">所选时段（${st.date}）</div><div class="v" style="font-size:16px">${spanLabel(st.from, st.to)}</div></div>
     <div class="sum-item"><div class="k">时段增量合计</div><div class="v">+${fmtNum(totInc, cfg.precision)}<small>${cfg.unit}</small></div></div>
     <div class="sum-item"><div class="k">时段末累计</div><div class="v">${fmtNum(lastCum, cfg.precision)}<small>${cfg.unit}</small></div></div>`;
   if(cfg.hasRegion) summaryHtml += `<div class="sum-item"><div class="k">区域</div><div class="v" style="font-size:16px">${st.region}</div></div>`;
@@ -602,30 +640,45 @@ function drawTable(m){
 function exportExcel(m){
   const cfg = METRICS[m];
   const wb = XLSX.utils.book_new();
+  const st = getState(m);
+  if(!RAW[st.date]){ alert("所选日期暂无数据"); return; }
 
   if(m === "realtime"){
-    const st = getState("realtime");
-    if(!RAW[st.date]){ alert("所选日期暂无数据"); return; }
     const regions = st.region === "全区域" ? REGIONS : [st.region];
-    const showCap = st.region !== "全区域";
-    const display = n => showCap ? fmtRT(n) : String(n);
-    /* sheet：小时最高人数 */
+    const fromMin = st.from * 30, toMin = Math.min(st.to * 30, 24 * 60);
+    const lastMin = lastDataMinute(st.date);
+    /* sheet 1：小时最高人数 */
     const hourRows = [];
     regions.forEach(rg => {
-      for(let h = st.from; h <= st.to; h++)
-        hourRows.push([`${String(h).padStart(2,"0")}:00 – ${String(h).padStart(2,"0")}:59`, rg,
-          hourHasData(st.date, h) ? display(rtHourMax(st.date, rg, h)) : "—"]);
+      for(let h = 0; h < HOURS; h++){
+        const sMin = Math.max(h * 60, fromMin), eMin = Math.min(h * 60 + 60, toMin);
+        if(sMin >= eMin) continue;
+        hourRows.push([`${fmtHM((sMin/60)|0, sMin%60)} – ${fmtHM(((eMin-1)/60)|0, (eMin-1)%60)}`, rg,
+          (eMin - 1) <= lastMin ? fmtRT(rtRangeMax(st.date, rg, sMin, eMin)) : "—"]);
+      }
     });
     const ws1 = XLSX.utils.aoa_to_sheet([["时间段","区域","小时最高实时人数（人）"], ...hourRows]);
     ws1["!cols"] = [{wch:18},{wch:10},{wch:20}];
     XLSX.utils.book_append_sheet(wb, ws1, "小时最高人数");
-    XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${st.date}_${String(st.from).padStart(2,"0")}-${String(st.to).padStart(2,"0")}时_${st.region}.xlsx`);
+    /* sheet 2：历史数据（每次上报的实时人数准确值） */
+    let histRows = [];
+    regions.forEach(rg => {
+      let count = 0;
+      RAW[st.date].realtime[rg].forEach(e => {
+        count = Math.max(0, count + e.delta);
+        const t = e.h * 60 + e.min;
+        if(t >= fromMin && t < toMin) histRows.push([fmtHM(e.h, e.min), rg, fmtRT(count)]);
+      });
+    });
+    histRows.sort((a,b) => a[0].localeCompare(b[0]));
+    const ws2 = XLSX.utils.aoa_to_sheet([["时间","区域","实时人数（人）"], ...histRows]);
+    ws2["!cols"] = [{wch:10},{wch:10},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, ws2, "历史数据");
+    XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${st.date}_${spanLabel(st.from, st.to)}_${st.region}.xlsx`);
     return;
   }
 
   if(m === "dwell"){
-    const st = getState("dwell");
-    if(!RAW[st.date]){ alert("所选日期暂无数据"); return; }
     const regions = st.region === "全区域" ? [...REGIONS, "全区域"] : [st.region];
     const rows = regions.map(rg => ({ rg, ...dwellRange(st.date, rg, st.from, st.to) }));
     const data = [cfg.cols];
@@ -633,16 +686,14 @@ function exportExcel(m){
     const ws = XLSX.utils.aoa_to_sheet(data);
     ws["!cols"] = [{wch:10},{wch:22},{wch:26},{wch:22}];
     XLSX.utils.book_append_sheet(wb, ws, cfg.name);
-    XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${st.date}_${String(st.from).padStart(2,"0")}-${String(st.to).padStart(2,"0")}时_${st.region}.xlsx`);
+    XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${st.date}_${spanLabel(st.from, st.to)}_${st.region}.xlsx`);
     return;
   }
 
-  const st = getState(m);
-  if(!RAW[st.date]){ alert("所选日期暂无数据"); return; }
   const rows = buildRows(m);
   const data = [cfg.cols];
   rows.forEach(r => {
-    const row = [r.hour];
+    const row = [r.label];
     if(cfg.hasRegion) row.push(r.region);
     row.push(r.inc, r.cum);
     data.push(row);
@@ -651,7 +702,7 @@ function exportExcel(m){
   ws["!cols"] = cfg.cols.map(()=>({wch:18}));
   XLSX.utils.book_append_sheet(wb, ws, cfg.name);
   const rg = cfg.hasRegion ? "_" + st.region : "";
-  XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${st.date}_${String(st.from).padStart(2,"0")}-${String(st.to).padStart(2,"0")}时${rg}.xlsx`);
+  XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${st.date}_${spanLabel(st.from, st.to)}${rg}.xlsx`);
 }
 
 render();
