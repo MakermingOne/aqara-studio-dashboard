@@ -163,7 +163,7 @@ function dayFactor(h){ // h 可为小数（半小时槽取半值）
 }
 
 function genRaw(){
-  const days = 7; // 最近 7 天
+  const days = 30; // 最近 30 天（支持近 7 天 / 近 30 天对比）
   const data = {};
   const today = new Date();
   const nowH = today.getHours(), nowM = today.getMinutes();
@@ -325,7 +325,7 @@ document.getElementById("headerDate").textContent =
 
 const state = {}; // 每个模块的筛选状态
 function getState(m){
-  if(!state[m]) state[m] = { date: todayKey(), from: 0, to: SLOTS, region: "全区域", tab: "hour" };
+  if(!state[m]) state[m] = { date: todayKey(), from: 0, to: SLOTS, region: "全区域", tab: "hour", range: 7 };
   return state[m];
 }
 
@@ -672,7 +672,7 @@ function drawDwell(){
     </div>`;
 
     if(!RAW[dateKey]){
-      wrap.innerHTML = `${tabsHtml}${filtersHtml}<div class="empty">所选日期暂无数据（演示数据保留最近 7 天）</div>`;
+      wrap.innerHTML = `${tabsHtml}${filtersHtml}<div class="empty">所选日期暂无数据（演示数据保留最近 30 天）</div>`;
       bindDwellCommon(st);
       const d = document.getElementById("dwDate");
       if(d) d.onchange = e => { st.date = e.target.value; drawDwell(); };
@@ -690,30 +690,39 @@ function drawDwell(){
         <div class="sum-item"><div class="k">当前平均驻留时长（${st.region}）</div><div class="v">${(+last.avg).toFixed(1)}<small>分钟</small></div></div>`;
       bodyHtml = dwellDetailHTML(detailRows);
     }else{
-      /* 历史日期：各区域全天固定值总览 + 折叠的分时明细 */
+      /* 历史日期：各区域全天固定值总览 + 折叠的分时明细（随所选区域联动） */
       const overview = [...REGIONS, "全区域"].map(rg => ({ rg, ...dwellDayTotal(dateKey, rg) }));
-      const all = overview[overview.length - 1];
+      const sel = overview.find(r => r.rg === st.region) || overview[overview.length - 1];
       summaryHtml = `
         <div class="sum-item"><div class="k">所选日期</div><div class="v" style="font-size:16px">${dateKey}</div></div>
         <div class="sum-item"><div class="k">数据口径</div><div class="v" style="font-size:16px">全天固定值</div></div>
-        <div class="sum-item"><div class="k">全天平均驻留时长（全区域）</div><div class="v">${(+all.avg).toFixed(1)}<small>分钟</small></div></div>`;
+        <div class="sum-item"><div class="k">全天平均驻留时长（${st.region}）</div><div class="v">${(+sel.avg).toFixed(1)}<small>分钟</small></div></div>`;
       bodyHtml = `
         <table><thead><tr><th>区域</th><th>访问人次（人次）</th><th>累计驻留（人·分钟）</th><th>平均驻留时长（分钟）</th></tr></thead>
-        <tbody>${overview.map(r => `<tr>
-          <td>${r.rg}</td><td>${r.visits}</td><td>${r.personMin}</td>
+        <tbody>${overview.map(r => `<tr style="${r.rg===st.region?"background:#f4f5f8;":""}">
+          <td>${r.rg}${r.rg===st.region ? " ●" : ""}</td><td>${r.visits}</td><td>${r.personMin}</td>
           <td><strong>${(+r.avg).toFixed(1)}</strong></td></tr>`).join("")}</tbody></table>
         ${dwellDetailHTML(detailRows)}`;
     }
   }else{
-    /* 历史对比：可选区域，逐日变化图表 + 日期倒序矩阵表 */
-    const datesAsc = Object.keys(RAW).sort();
-    const matrix = dwellHistMatrix().sort((a,b) => b.date.localeCompare(a.date)); // 近 → 远
+    /* 历史对比：可选区域 + 日期范围（近7天/近30天），逐日变化图表 + 日期倒序矩阵表 */
+    const range = (st.range === 30) ? 30 : 7;
+    const datesAsc = Object.keys(RAW).sort().slice(-range);
+    const matrix = dwellHistMatrix()
+      .filter(r => datesAsc.indexOf(r.date) >= 0)
+      .sort((a,b) => b.date.localeCompare(a.date)); // 近 → 远
     const regionCols = [...REGIONS, "全区域"];
     const colIdx = regionCols.indexOf(st.region);
-    const ascMatrix = dwellHistMatrix();
-    const chartValues = datesAsc.map(d => +(ascMatrix.find(r => r.date === d)[st.region]));
+    const chartValues = datesAsc.map(d => +(matrix.find(r => r.date === d)[st.region]));
     const avgAll = chartValues.length ? sumArr(chartValues) / chartValues.length : 0;
-    filtersHtml = `<div class="filters">${dwellRegionSeg(st)}<button class="export-btn" id="exportBtn">导出 Excel</button></div>`;
+    const rangeSeg = `<div class="filter-group">
+      <span class="filter-label">日期范围</span>
+      <div class="seg" id="rangeSeg">
+        <button data-n="7" class="${range===7?"on":""}">近 7 天</button>
+        <button data-n="30" class="${range===30?"on":""}">近 30 天</button>
+      </div>
+    </div>`;
+    filtersHtml = `<div class="filters">${rangeSeg}${dwellRegionSeg(st)}<button class="export-btn" id="exportBtn">导出 Excel</button></div>`;
     summaryHtml = `
       <div class="sum-item"><div class="k">所选区域</div><div class="v" style="font-size:16px">${st.region}</div></div>
       <div class="sum-item"><div class="k">日期范围</div><div class="v" style="font-size:16px">${datesAsc[0]} ~ ${datesAsc[datesAsc.length-1]}</div></div>
@@ -738,6 +747,12 @@ function bindDwellCommon(st){
   });
   const d = document.getElementById("dwDate");
   if(d) d.onchange = e => { st.date = e.target.value; drawDwell(); };
+  const rs = document.getElementById("rangeSeg");
+  if(rs) rs.addEventListener("click", e => {
+    const b = e.target.closest("button"); if(!b) return;
+    st.range = +b.dataset.n;
+    drawDwell();
+  });
   document.getElementById("regionSeg").addEventListener("click", e => {
     const b = e.target.closest("button"); if(!b) return;
     st.region = b.dataset.r;
@@ -875,15 +890,19 @@ function exportExcel(m){
         XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${dateKey}_全天_${st.region}.xlsx`);
       }
     }else{
-      /* 历史对比：矩阵（近 → 远） */
+      /* 历史对比：矩阵（近 → 远，跟随所选日期范围） */
+      const range = (st.range === 30) ? 30 : 7;
+      const datesAsc = Object.keys(RAW).sort().slice(-range);
       const regionCols = [...REGIONS, "全区域"];
-      const matrix = dwellHistMatrix().sort((a,b) => b.date.localeCompare(a.date));
+      const matrix = dwellHistMatrix()
+        .filter(r => datesAsc.indexOf(r.date) >= 0)
+        .sort((a,b) => b.date.localeCompare(a.date));
       const data = [["日期", ...regionCols.map(c => c + "（分钟）")]];
       matrix.forEach(r => data.push([r.date + (r.date === todayKey() ? "（截至当前）" : ""), ...regionCols.map(c => (+r[c]).toFixed(1))]));
       const ws = XLSX.utils.aoa_to_sheet(data);
       ws["!cols"] = [{wch:16}, ...regionCols.map(()=>({wch:12}))];
       XLSX.utils.book_append_sheet(wb, ws, "历史对比");
-      XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_历史对比_${st.region}.xlsx`);
+      XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_历史对比_近${range}天_${st.region}.xlsx`);
     }
     return;
   }
