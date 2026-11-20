@@ -1,6 +1,333 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
+<head><script>var __mr='all',__md='te6tndcl.qwenwork.host';document.addEventListener('DOMContentLoaded', function () {
+  var BAR_HEIGHT = 48;
+
+  // --- detect page theme ---
+  var isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+  // fallback: sample body/html background color
+  if (!isDark) {
+    try {
+      var sample = getComputedStyle(document.body).backgroundColor;
+      if (sample === 'rgba(0, 0, 0, 0)' || sample === 'transparent') {
+        sample = getComputedStyle(document.documentElement).backgroundColor;
+      }
+      if (sample && sample !== 'rgba(0, 0, 0, 0)' && sample !== 'transparent') {
+        var m = sample.match(/\d+/g);
+        if (m) {
+          var brightness = (parseInt(m[0]) * 299 + parseInt(m[1]) * 587 + parseInt(m[2]) * 114) / 1000;
+          isDark = brightness < 128;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // --- shared CSS (always injected into <head>) ---
+  var SHARED_CSS = '<style>' +
+    '@keyframes mulepage-svg-glow-dark{0%,100%{color:#ffffff}50%{color:#3b82f6}}' +
+    '@keyframes mulepage-svg-glow-light{0%,100%{color:#000000}50%{color:#3b82f6}}' +
+    '.mulepage-anim-dark{animation:mulepage-svg-glow-dark 2.5s ease-in-out infinite}' +
+    '.mulepage-anim-light{animation:mulepage-svg-glow-light 2.5s ease-in-out infinite}' +
+    '.mulepage-close-dark{color:rgba(255,255,255,0.3);transition:color 0.2s ease}' +
+    '.mulepage-close-dark:hover{color:#ffffff}' +
+    '.mulepage-close-light{color:rgba(0,0,0,0.3);transition:color 0.2s ease}' +
+    '.mulepage-close-light:hover{color:#000000}' +
+    '#mulepage-footer-link{display:inline-flex;align-items:center;line-height:0;outline:none}' +
+    '.mulepage-footer-brand{display:inline-flex;align-items:center;box-sizing:border-box;height:32px;max-width:104px;overflow:hidden;padding:6px 12px;border-radius:999px;background:' + (isDark ? 'rgba(26,26,26,0.85)' : 'rgba(255,255,255,0.85)') + ';backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 0 0 0.5px ' + (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)') + ',0 8px 24px -4px ' + (isDark ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.07)') + ';transition:max-width 260ms cubic-bezier(0.22,1,0.36,1);will-change:max-width;white-space:nowrap}' +
+    '.mulepage-footer-brand-hint{display:inline-block;width:134px;max-width:0;margin-left:0;overflow:hidden;opacity:0;color:' + (isDark ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.64)') + ';font-size:14px;font-weight:400;line-height:20px;transition:max-width 260ms cubic-bezier(0.22,1,0.36,1),margin-left 260ms cubic-bezier(0.22,1,0.36,1),opacity 180ms ease-out;will-change:max-width,opacity}' +
+    '#mulepage-footer:hover .mulepage-footer-brand,#mulepage-footer:focus-within .mulepage-footer-brand{max-width:246px}' +
+    '#mulepage-footer:hover .mulepage-footer-brand-hint,#mulepage-footer:focus-within .mulepage-footer-brand-hint{max-width:134px;margin-left:8px;opacity:1}' +
+    '.mulepage-float-close{display:inline-flex;align-items:center;justify-content:center;max-width:0;margin-left:0;overflow:hidden;opacity:0;transition:max-width 0.2s ease,margin-left 0.2s ease,opacity 0.15s ease;padding:0;border:none;background:none;cursor:pointer;font-size:16px;line-height:1;font-weight:300;height:16px;will-change:max-width,opacity}' +
+    '.mulepage-float:hover .mulepage-float-close{max-width:14px;margin-left:4px;opacity:1}' +
+    '</style>';
+
+  // always inject shared CSS into <head> so it survives banner removal
+  document.head.insertAdjacentHTML('beforeend', SHARED_CSS);
+
+  // --- SVG icon (shared, rx=0 for sharp corners) ---
+  var ICON16 = '<svg width="16" height="16" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+    '<rect width="36" height="36" rx="0" fill="#FBF9F6"/><g clip-path="url(#c_top)">' +
+    '<path d="M6.387 21.732v8.895H18.762V28.5h2.32v1.16h8.121V28.5h1.16v-7.928h-1.16v-1.16h-4.64v-1.16h-1.16v-1.16h-1.16v-1.16h-1.16v-1.16h-1.16v-1.16h3.287v-1.934h3.48V9.357H16.442v3.48h-2.128V6.07h-2.32v2.127H9.674v3.48H7.547v10.055H6.387Z" fill="#000"/>' +
+    '<path d="M13.154 21.732v-4.447h1.16v-1.16h4.448v4.447h-1.16v1.16h-4.448Z" fill="#fff"/>' +
+    '<rect x="15.281" y="18.252" width="2.32" height="2.32" fill="#000"/>' +
+    '<path d="M21.082 27.34v-5.608h1.16v-1.16h5.801v1.16h1.16v5.608h-1.16V28.5h-5.801v-1.16h-1.16Z" fill="#fff"/>' +
+    '<path d="M26.883 21.732h-2.32v1.16h1.16v1.16h1.16v-2.32Z" fill="#000"/>' +
+    '<path d="M22.242 24.053v2.32h1.16v1.16h3.48v-1.16h-2.32v-1.16h-1.16v-1.16h-1.16Z" fill="#000"/>' +
+    '</g><defs><clipPath id="c_top"><rect width="24.75" height="24.75" fill="#fff" transform="translate(6 6)"/></clipPath></defs></svg>';
+
+  var ICON16_FOOT = ICON16.replace(/c_top/g, 'c_foot');
+
+  // --- 品牌标志：按主题直接设置 SVG 填色，强制颜色模式由浏览器适配。 ---
+  var brandIconPath = 'M9.57761 1.20772L8.19405 2.01959C7.93541 2.17156 7.7751 2.45222 7.7751 2.75616V4.26489C7.7751 4.56882 7.93541 4.85087 8.19405 5.00283L11.1849 6.75663C11.4435 6.9086 11.6038 7.19063 11.6038 7.49457V9.04441C11.6038 9.3483 11.7628 9.62902 12.0228 9.7809L13.0076 10.36C13.2662 10.512 13.587 10.512 13.8456 10.36L17.2809 8.34343C17.5409 8.19143 17.7013 7.91083 17.7013 7.60552V5.97352C17.7013 5.66821 17.5409 5.38755 17.2809 5.23558L10.4156 1.20772C10.157 1.05576 9.83767 1.05576 9.57761 1.20772ZM17.7188 14.0265V12.4028C17.7188 12.0988 17.5584 11.8182 17.2998 11.6662L16.0146 10.9118C15.7545 10.7599 15.4353 10.7599 15.1766 10.9118L12.1858 12.6656C11.9272 12.8176 11.6079 12.8176 11.3478 12.6656L10.0277 11.8907C9.76891 11.7387 9.44829 11.7387 9.18965 11.8907L8.20486 12.4685C7.94479 12.6218 7.78591 12.9025 7.78591 13.2064V17.2384C7.78591 17.5423 7.94479 17.8243 8.20486 17.9763L9.59649 18.7922C9.85513 18.9442 10.1744 18.9442 10.4345 18.7922L17.2998 14.7644C17.5584 14.6125 17.7188 14.3318 17.7188 14.0265ZM2.70022 14.7781L4.08379 15.59C4.34381 15.7419 4.66309 15.7419 4.92175 15.59L6.20697 14.8356C6.46699 14.6836 6.6273 14.4016 6.6273 14.0977L6.62596 10.5888C6.62596 10.2848 6.78627 10.0042 7.04627 9.85215L8.36648 9.07719C8.62523 8.92531 8.78554 8.64328 8.78554 8.33928V7.18378C8.78554 6.87847 8.62523 6.59781 8.36648 6.44584L4.92984 4.42919C4.67118 4.27721 4.35189 4.27721 4.09188 4.42919L2.70022 5.24653C2.44156 5.39849 2.28125 5.67916 2.28125 5.9831V14.0402C2.28125 14.3441 2.44156 14.6261 2.70022 14.7781Z';
+  var brandWordmarkPath = 'M50.3395 4.44372C50.3725 4.44405 50.4053 4.45293 50.4338 4.46969C50.4623 4.48649 50.4858 4.51069 50.5022 4.53942C50.5185 4.56819 50.5275 4.60065 50.5275 4.63376C50.5274 4.66699 50.5181 4.70001 50.5015 4.72878L46.2598 12.0927H52.5427L50.2465 8.10517C50.2298 8.07662 50.2214 8.04393 50.2212 8.01083C50.2211 7.97767 50.2293 7.94454 50.2458 7.91581C50.2623 7.88716 50.2863 7.86325 50.3149 7.84676C50.3435 7.83027 50.3762 7.82199 50.4092 7.82215H52.1633C52.23 7.82218 52.2956 7.83944 52.3534 7.87274C52.4112 7.90609 52.4593 7.95439 52.4928 8.0122L54.7234 11.9047C54.7971 12.0301 54.8355 12.1735 54.8341 12.319V13.7286C54.8341 13.8006 54.8056 13.8698 54.7548 13.9207C54.704 13.9716 54.6346 14 54.5628 14H44.5173C44.453 14.0004 44.3908 13.9778 44.3416 13.9364C44.2924 13.895 44.2593 13.8373 44.2486 13.7737L43.9711 12.1898C43.96 12.1269 43.971 12.0621 44.0025 12.0066L48.2559 4.63581C48.2893 4.57783 48.3369 4.5294 48.3947 4.49567C48.4525 4.46193 48.5185 4.4442 48.5854 4.44372H50.3395ZM34.0063 0.0145621C34.0783 0.0151591 34.1476 0.0446248 34.1984 0.0959126C34.249 0.147176 34.2777 0.216573 34.2777 0.288693V1.23892H37.9821C38.0538 1.23898 38.1228 1.26741 38.1735 1.31822C38.2243 1.3691 38.2527 1.43836 38.2528 1.51032V13.706C38.2528 13.778 38.2243 13.8472 38.1735 13.8981C38.1227 13.949 38.0538 13.9774 37.9821 13.9774H35.0966C35.0299 13.9776 34.9644 13.9602 34.9066 13.9268C34.8487 13.8935 34.8005 13.8454 34.7671 13.7874L33.9543 12.3778C33.9376 12.3492 33.9292 12.3165 33.929 12.2834C33.9289 12.2503 33.9371 12.2171 33.9536 12.1884C33.9701 12.1598 33.9941 12.1359 34.0227 12.1194C34.0513 12.1029 34.084 12.0946 34.117 12.0948H36.2615V3.12434H34.2729V4.77595C34.2772 7.99467 33.3348 11.1436 31.5638 13.8284C31.5285 13.8804 31.4811 13.9233 31.4257 13.9528C31.3704 13.9823 31.3086 13.9977 31.2459 13.9979H29.3359C29.3008 13.9982 29.2661 13.9884 29.2361 13.9699C29.2063 13.9514 29.182 13.9249 29.1664 13.8934C29.1509 13.8617 29.1444 13.8259 29.1479 13.7908C29.1515 13.7557 29.1653 13.7222 29.1869 13.6944C31.1857 11.1541 32.27 8.01137 32.2638 4.77595V3.12434H30.2479C30.1812 3.12431 30.1156 3.10639 30.0578 3.07306C30 3.03971 29.9519 2.99142 29.9184 2.93361L29.1076 1.52399C29.0909 1.49542 29.0825 1.46275 29.0823 1.42965C29.0822 1.39656 29.0905 1.36399 29.1069 1.33531C29.1234 1.3066 29.1473 1.28279 29.176 1.26626C29.2047 1.24974 29.2372 1.24081 29.2703 1.24097H32.2638V0.288693C32.2638 0.25216 32.2708 0.215717 32.285 0.182048C32.2991 0.148458 32.3198 0.117974 32.3458 0.0924945C32.3718 0.0670545 32.4029 0.0470581 32.4367 0.0337034C32.4706 0.0203804 32.507 0.0136933 32.5434 0.0145621H34.0063ZM15.9217 3.67191C15.9937 3.67251 16.063 3.70131 16.1138 3.75258C16.1645 3.80382 16.193 3.8732 16.1931 3.94536V13.7149C16.1931 13.7505 16.1861 13.786 16.1726 13.8188C16.159 13.8517 16.1389 13.8818 16.1138 13.907C16.0886 13.9322 16.0585 13.9522 16.0256 13.9658C15.9927 13.9795 15.9573 13.9863 15.9217 13.9863H14.4725C14.4007 13.9863 14.3318 13.9579 14.2811 13.907C14.2303 13.8561 14.2018 13.7869 14.2018 13.7149V3.95698C14.2018 3.88477 14.2303 3.81548 14.2811 3.7642C14.3317 3.71296 14.4005 3.6835 14.4725 3.68285L15.9217 3.67191ZM25.7778 0.456179C25.8499 0.456176 25.9194 0.484614 25.9706 0.535478C26.0217 0.586332 26.0506 0.655395 26.0512 0.727575V13.704C26.0506 13.7761 26.0217 13.8453 25.9706 13.8961C25.9194 13.9469 25.8498 13.9754 25.7778 13.9754H22.893C22.8263 13.9754 22.7608 13.9575 22.703 13.9241C22.6452 13.8908 22.5971 13.8431 22.5635 13.7853L21.7507 12.375C21.734 12.3464 21.7248 12.3139 21.7248 12.2807C21.7247 12.2474 21.734 12.2145 21.7507 12.1857C21.7675 12.1569 21.7915 12.133 21.8205 12.1166C21.8494 12.1003 21.8822 12.0922 21.9155 12.0927H24.0599V2.33886H18.5679C18.5012 2.33883 18.4357 2.32094 18.3779 2.28759C18.3201 2.25426 18.272 2.20655 18.2384 2.14881L17.4256 0.739196C17.4095 0.710318 17.4014 0.67726 17.4017 0.644173C17.402 0.611267 17.4105 0.578965 17.427 0.550518C17.4436 0.522017 17.4675 0.497993 17.496 0.481472C17.5246 0.464946 17.5573 0.456302 17.5903 0.456179H25.7778ZM10.9424 0.0125113C11.0281 -0.0094232 11.1186 -0.00233281 11.2001 0.0323362C11.2817 0.0670961 11.3497 0.128021 11.3935 0.205291L12.0867 1.40914C12.1019 1.43883 12.1102 1.4715 12.1113 1.50485C12.1124 1.5383 12.1062 1.57191 12.0929 1.6026C12.0795 1.63337 12.0593 1.66124 12.0341 1.68327C12.0088 1.70526 11.9788 1.72141 11.9466 1.73044C10.4176 2.08949 8.87647 2.39115 7.32339 2.63555V5.94631L12.3554 5.95109C12.4272 5.95111 12.496 5.97948 12.5468 6.03039C12.5976 6.08132 12.6261 6.15047 12.6261 6.22249V7.58015C12.6261 7.65217 12.5976 7.72132 12.5468 7.77225C12.496 7.82311 12.4271 7.85153 12.3554 7.85155H7.3145V13.7019C7.31442 13.7737 7.28578 13.8425 7.2352 13.8934C7.18448 13.9442 7.11553 13.9733 7.0438 13.9733H5.57133C5.49958 13.9733 5.43066 13.9442 5.37992 13.8934C5.32932 13.8425 5.30071 13.7737 5.30062 13.7019V7.8495H0.271389C0.235862 7.8495 0.20031 7.8426 0.167482 7.82899C0.134627 7.81534 0.104447 7.7954 0.0792974 7.7702C0.0541601 7.745 0.0341211 7.71493 0.0205079 7.68201C0.00692189 7.64913 2.85566e-05 7.61369 0 7.5781V6.21975C8.05178e-05 6.14763 0.0286325 6.07819 0.0792974 6.02697C0.130028 5.97574 0.199375 5.9469 0.271389 5.94631H5.30062V2.909C4.09666 3.05835 2.89245 3.17412 1.68849 3.25559C1.61235 3.261 1.53643 3.24437 1.46905 3.20842C1.40157 3.17239 1.34508 3.11836 1.30704 3.05187L0.526371 1.69421C0.510444 1.66708 0.501697 1.63612 0.501077 1.60466C0.500509 1.57308 0.507964 1.54151 0.522953 1.51373C0.537928 1.48602 0.559909 1.46284 0.586527 1.44606C0.6132 1.42926 0.64393 1.41951 0.675395 1.41803C4.13048 1.2347 7.56472 0.764459 10.9424 0.0125113ZM22.5116 4.06363C22.5471 4.06363 22.5826 4.07049 22.6155 4.08413C22.6482 4.09778 22.6779 4.11779 22.703 4.14292C22.7281 4.16814 22.7482 4.19817 22.7618 4.23111C22.7753 4.26401 22.7823 4.29942 22.7823 4.33502V10.5669C22.7823 10.6025 22.7754 10.6385 22.7618 10.6715C22.7482 10.7043 22.728 10.7338 22.703 10.759C22.6779 10.7841 22.6482 10.8041 22.6155 10.8178C22.5826 10.8314 22.5471 10.8389 22.5116 10.839H17.6895C17.6177 10.8389 17.5488 10.8099 17.4981 10.759C17.4473 10.7081 17.4188 10.6388 17.4188 10.5669V4.33502C17.4188 4.26301 17.4473 4.19385 17.4981 4.14292C17.5488 4.09201 17.6177 4.06364 17.6895 4.06363H22.5116ZM31.5754 4.06363C31.6056 4.06373 31.6354 4.07084 31.6622 4.08482C31.6891 4.09882 31.7124 4.11883 31.7299 4.14361C31.7474 4.16843 31.7586 4.19761 31.7627 4.22769C31.7668 4.25759 31.7638 4.2881 31.7538 4.31656L29.4733 10.5874C29.4472 10.661 29.399 10.7249 29.3353 10.7699C29.2714 10.8149 29.1946 10.8393 29.1165 10.839H27.5367C27.5065 10.839 27.4767 10.8317 27.4499 10.8178C27.423 10.8037 27.3995 10.7832 27.3822 10.7583C27.3649 10.7334 27.3539 10.7043 27.3501 10.6742C27.3463 10.6442 27.3498 10.6137 27.3603 10.5853L29.636 4.31451C29.6629 4.24077 29.712 4.17693 29.7762 4.13199C29.8403 4.08714 29.9167 4.06351 29.9949 4.06363H31.5754ZM40.2776 3.1216C40.3669 3.12177 40.4532 3.15371 40.5217 3.21115C40.5901 3.26857 40.6363 3.34807 40.6522 3.43606L41.91 10.5874C41.9157 10.6182 41.9146 10.6501 41.9066 10.6804C41.8987 10.7106 41.8836 10.7384 41.8636 10.7624C41.8435 10.7864 41.8187 10.806 41.7904 10.8191C41.7622 10.8322 41.7313 10.8391 41.7002 10.839H40.2503C40.1611 10.8387 40.0746 10.8068 40.0062 10.7494C39.9378 10.6919 39.8915 10.6119 39.8757 10.5238L38.6185 3.37522C38.6148 3.34449 38.6173 3.31331 38.626 3.28362C38.6348 3.25387 38.6499 3.22604 38.6698 3.20227C38.6896 3.17862 38.714 3.15935 38.7416 3.14553C38.7692 3.13171 38.7996 3.12326 38.8304 3.1216H40.2776ZM19.3554 8.95627H20.8456V5.94631H19.3554V8.95627ZM51.8926 0.463015C51.9665 0.462456 52.039 0.48304 52.1011 0.523173C52.1633 0.563383 52.2127 0.621467 52.2426 0.689292C53.2031 2.93221 54.3588 5.08567 55.6968 7.12418L55.9669 7.53435C55.9862 7.56258 55.9977 7.59586 55.9997 7.63005C56.0016 7.66432 55.9945 7.69886 55.9785 7.72918C55.9624 7.75948 55.9381 7.78474 55.9088 7.80233C55.8794 7.81986 55.8458 7.82917 55.8117 7.82899H53.9673C53.9034 7.82925 53.8402 7.81269 53.7841 7.78182C53.7282 7.75101 53.6808 7.70673 53.6467 7.65261C52.2539 5.45415 51.06 3.13466 50.0797 0.722789C50.0683 0.693995 50.0641 0.662659 50.0674 0.631868C50.0708 0.601234 50.0816 0.571953 50.0989 0.546416C50.1162 0.520752 50.1399 0.499426 50.1672 0.484891C50.1944 0.470456 50.2246 0.463092 50.2554 0.463015H51.8926ZM48.4138 0.456179C48.4449 0.455674 48.4758 0.463016 48.5033 0.477371C48.5308 0.49171 48.5543 0.512555 48.5717 0.538213C48.5892 0.564028 48.6 0.593997 48.6031 0.625032C48.6063 0.656014 48.6014 0.687213 48.5895 0.715953C47.6712 2.97711 46.5654 5.15699 45.2836 7.23219L45.0252 7.64783C44.9906 7.70211 44.9428 7.74686 44.8864 7.77772C44.8301 7.80854 44.7668 7.82439 44.7025 7.8242H42.8582C42.8239 7.82445 42.7898 7.81581 42.7604 7.79822C42.731 7.78064 42.7074 7.75471 42.6914 7.72439C42.6754 7.69411 42.6676 7.66017 42.6695 7.62595C42.6715 7.59167 42.6829 7.55854 42.7023 7.53025C44.1557 5.3696 45.4035 3.07693 46.4293 0.682456C46.4589 0.61481 46.5077 0.557239 46.5694 0.517021C46.6312 0.476836 46.7036 0.455724 46.7773 0.456179H48.4138ZM15.7098 0.0125113C15.7765 0.0125388 15.842 0.0304272 15.8998 0.0637826C15.9576 0.0971219 16.0057 0.144814 16.0393 0.202557L17.3032 2.38671C17.32 2.41539 17.3291 2.44781 17.3292 2.48105C17.3293 2.51434 17.3206 2.54731 17.3039 2.57607C17.2871 2.60488 17.2625 2.62876 17.2335 2.64512C17.2046 2.6614 17.1717 2.66962 17.1385 2.66905H15.5088C15.4421 2.66901 15.3766 2.65178 15.3188 2.61846C15.2609 2.5851 15.2129 2.53681 15.1793 2.479L13.9222 0.295529C13.9061 0.26665 13.8972 0.233592 13.8976 0.200506C13.8979 0.167577 13.907 0.135301 13.9235 0.10685C13.9402 0.0782791 13.964 0.0543312 13.9926 0.0378051C14.0212 0.021279 14.0539 0.012635 14.0869 0.0125113H15.7098Z';
+  function brandSvg(width, height, path) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', width);
+    svg.setAttribute('height', height);
+    svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    // 保留继承的交互和可见性状态，单独重置 SVG 绘制属性。
+    svg.style.all = 'unset';
+    svg.style.fill = 'none';
+    svg.style.fillOpacity = '1';
+    svg.style.fillRule = 'nonzero';
+    svg.style.stroke = 'none';
+    svg.style.marker = 'none';
+    svg.style.shapeRendering = 'auto';
+    svg.style.display = 'block';
+    svg.style.overflow = 'visible';
+    svg.style.width = width + 'px';
+    svg.style.height = height + 'px';
+    var shape = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    shape.setAttribute('d', path);
+    shape.setAttribute('fill', isDark ? '#ebebeb' : '#141414');
+    // 在路径上完成绘制和裁剪，保留 SVG 根节点原有的布局与抗锯齿方式。
+    if (isDark) shape.style.filter = 'opacity(1)';
+    svg.appendChild(shape);
+    return svg;
+  }
+  function mountBrand(container, footer) {
+    try {
+      container.setAttribute('aria-label', '打开千问办公');
+      var capsule = document.createElement('span');
+      capsule.style.display = 'inline-flex';
+      capsule.style.alignItems = 'center';
+      capsule.style.boxSizing = 'border-box';
+      capsule.style.height = '32px';
+      capsule.style.padding = '6px 12px';
+      capsule.style.borderRadius = '999px';
+      if (footer) {
+        capsule.className = 'mulepage-footer-brand';
+        capsule.style.color = isDark ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.64)';
+        capsule.style.setProperty('background', isDark ? 'rgba(26,26,26,0.85)' : 'rgba(255,255,255,0.85)', 'important');
+      } else {
+        capsule.style.justifyContent = 'center';
+        capsule.style.width = '104px';
+        container.style.background = isDark ? '#050505' : '#ffffff';
+        container.style.borderRadius = '999px';
+        capsule.style.setProperty('background', isDark ? 'rgba(255,255,255,0.12)' : '#f5f5f5', 'important');
+      }
+      var host = document.createElement('span');
+      host.className = 'mulepage-brand-mark';
+      host.style.setProperty('all', 'unset', 'important');
+      host.style.setProperty('display', 'inline-flex', 'important');
+      host.style.setProperty('align-items', 'center', 'important');
+      host.style.setProperty('gap', '4px', 'important');
+      host.style.setProperty('line-height', '0', 'important');
+      host.style.setProperty('direction', 'ltr', 'important');
+      host.style.setProperty('writing-mode', 'horizontal-tb', 'important');
+      var shadow = host.attachShadow({ mode: 'open' });
+      // 未分配到 slot 的子节点不显示，同时让宿主保持非 :empty，与原图片包装一致。
+      host.appendChild(document.createElement('span'));
+      shadow.appendChild(brandSvg(20, 20, brandIconPath));
+      shadow.appendChild(brandSvg(56, 14, brandWordmarkPath));
+      capsule.appendChild(host);
+      if (footer) {
+        var hint = document.createElement('span');
+        hint.className = 'mulepage-footer-brand-hint';
+        hint.textContent = 'AI 生成，请注意核实';
+        capsule.appendChild(hint);
+      }
+      container.appendChild(capsule);
+      function syncViewport() {
+        if (!host.isConnected) return;
+        var ratio = window.devicePixelRatio || 1;
+        shadow.querySelectorAll('svg').forEach(function (svg) {
+          var rect = svg.getBoundingClientRect();
+          if (!rect.height) return;
+          // 匹配图片视口的物理像素上边界，不移动笔画；缩放时重新计算。
+          var top = (Math.round(rect.top * ratio) / ratio - rect.top) * svg.height.baseVal.value / rect.height;
+          svg.firstElementChild.style.clipPath = 'inset(' + top + 'px 0 0) view-box';
+        });
+      }
+      function watchResolution() {
+        if (!host.isConnected) return;
+        syncViewport();
+        if (window.matchMedia) {
+          var query = window.matchMedia('(resolution: ' + (window.devicePixelRatio || 1) + 'dppx)');
+          if (query.addEventListener) query.addEventListener('change', watchResolution, { once: true });
+        }
+      }
+      watchResolution();
+      window.addEventListener('resize', syncViewport);
+      if (window.ResizeObserver) new ResizeObserver(syncViewport).observe(capsule);
+      if (document.fonts) document.fonts.ready.then(syncViewport);
+    } catch (error) {
+      console.warn('Failed to mount QwenWork branding', error);
+    }
+  }
+
+  // --- banner (adapts to page theme) ---
+  var bannerBg = isDark ? '#050505' : '#ffffff';
+  var bannerBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  var bannerColor = isDark ? '#fff' : '#000';
+  var bannerDividerColor = isDark ? 'rgba(255,255,255,0.24)' : 'rgba(0,0,0,0.16)';
+  var bannerCloseClass = isDark ? 'mulepage-close-dark' : 'mulepage-close-light';
+
+  var BANNER = '<div id="mulepage-bar" dir="ltr" style="position:fixed;top:0;left:0;width:100%;height:' + BAR_HEIGHT + 'px;' +
+    'background:' + bannerBg + ';border-bottom:1px solid ' + bannerBorder + ';color:' + bannerColor + ';' +
+    'box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:8px;' +
+    'font-family:\'PingFang SC\',Inter,-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;' +
+    'font-size:14px;font-weight:500;line-height:20px;z-index:2147483647;">' +
+    '<span aria-hidden="true" style="flex:1 1 0;height:32px;"></span>' +
+    '<div style="display:flex;align-items:center;gap:8px;white-space:nowrap;">' +
+    '<span>由</span>' +
+    '<span id="mulepage-bar-link" role="link" tabindex="0" aria-label="打开千问办公" style="display:inline-flex;align-items:center;cursor:pointer;line-height:0;">' +
+    '</span>' +
+    '<span>创建</span>' +
+    '<span aria-hidden="true" style="width:1px;height:16px;margin:0 4px;background:' + bannerDividerColor + ';"></span>' +
+    '<span id="mulepage-bar-cta" role="link" tabindex="0" aria-label="用千问办公创建网站" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:999px;cursor:pointer;">' +
+    '<span>一句话创建你的网站</span><span aria-hidden="true" style="font-size:16px;line-height:16px;">\u2192</span></span>' +
+    '</div>' +
+    '<span style="flex:1 1 0;display:flex;justify-content:flex-end;align-items:center;">' +
+    '<button id="mulepage-bar-close" class="' + bannerCloseClass + '" aria-label="关闭千问办公品牌栏" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:8px;background:none;border:none;border-radius:999px;' +
+    'font-size:18px;cursor:pointer;line-height:16px;font-weight:300;">\u00d7</button></span>' +
+    '</div>';
+
+  // --- 右下角品牌入口 ---
+  var floatCloseColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)';
+  var floatCloseHover = isDark ? '#ffffff' : '#000000';
+  var byColor = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)';
+
+  var FOOTER = '<div id="mulepage-footer" dir="ltr" class="mulepage-float" style="position:fixed !important;bottom:16px !important;right:16px !important;z-index:2147483646;' +
+    'display:inline-flex;align-items:center;padding:0;cursor:pointer;background:transparent;border:0;box-shadow:none;' +
+    'font-family:Inter,-apple-system,BlinkMacSystemFont,\'Segoe UI\',\'Helvetica Neue\',sans-serif;">' +
+    '<span id="mulepage-footer-link" role="link" tabindex="0" aria-label="打开千问办公" style="display:inline-flex;align-items:center;line-height:0;">' +
+    '</span>' +
+    '</div>';
+
+  // --- insert banner (only when mode is "all") ---
+  if (__mr === 'all') {
+    document.body.insertAdjacentHTML('afterbegin', BANNER);
+
+    // 顶栏品牌标志和行动文案均跳转至千问办公。
+    var openQwenWork = function () {
+      window.open('https://qwenwork.cn?utm_source=pages&utm_medium=banner&utm_campaign=pages_branding&utm_content=top_bar', '_blank', 'noopener');
+    };
+    var topBrandLink = document.getElementById('mulepage-bar-link');
+    mountBrand(topBrandLink);
+    var topBrandCta = document.getElementById('mulepage-bar-cta');
+    topBrandLink.addEventListener('click', openQwenWork);
+    topBrandCta.addEventListener('click', openQwenWork);
+    topBrandLink.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openQwenWork();
+      }
+    });
+    topBrandCta.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openQwenWork();
+      }
+    });
+
+    // Use the QwenWork favicon only as a fallback. Preserve favicons generated
+    // by the page itself so published sites can keep their own branding.
+    var existingIcon = document.querySelector('link[rel="icon"],link[rel="shortcut icon"]');
+    if (!existingIcon) {
+      var fi = document.createElement('link');
+      fi.rel = 'icon';
+      fi.type = 'image/svg+xml';
+      fi.href = 'https://qwenwork.cn/app/favicon.svg';
+      document.head.appendChild(fi);
+    }
+
+    // push down normal-flow content (accumulate on existing padding-top)
+    var origPT = parseFloat(getComputedStyle(document.body).paddingTop) || 0;
+    document.body.style.paddingTop = (origPT + BAR_HEIGHT) + 'px';
+
+    // push down all existing position:fixed elements
+    var all = document.querySelectorAll('*');
+    var shifted = [];
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (el.id && el.id.indexOf('mulepage') === 0) continue;
+      var cs = getComputedStyle(el);
+      if (cs.position === 'fixed') {
+        var t = parseFloat(cs.top);
+        if (isNaN(t)) t = 0;
+        el.style.top = (t + BAR_HEIGHT) + 'px';
+        shifted.push({ el: el, orig: t });
+      }
+    }
+
+    // close handler: restore everything
+    document.getElementById('mulepage-bar-close').addEventListener('click', function () {
+      document.getElementById('mulepage-bar').remove();
+      document.body.style.paddingTop = origPT + 'px';
+      for (var j = 0; j < shifted.length; j++) {
+        shifted[j].el.style.top = shifted[j].orig + 'px';
+      }
+    });
+  }
+
+  // --- insert floating widget (only when __mr is set) ---
+  if (__mr) {
+    document.body.insertAdjacentHTML('beforeend', FOOTER);
+
+    // 底部品牌标志点击后打开官网
+    var footerLink = document.getElementById('mulepage-footer-link');
+    if (footerLink) {
+      mountBrand(footerLink, true);
+      footerLink.addEventListener('click', function () {
+        window.open('https://qwenwork.cn?utm_source=pages&utm_medium=banner&utm_campaign=pages_branding&utm_content=bottom_bar', '_blank', 'noopener');
+      });
+      footerLink.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          footerLink.click();
+        }
+      });
+    }
+
+    // paid users (footer-only mode): add close button on hover
+    if (__mr === 'footer') {
+      var floatEl = document.getElementById('mulepage-footer');
+      if (floatEl) {
+        var closeBtn = document.createElement('button');
+        closeBtn.className = 'mulepage-float-close';
+        closeBtn.style.color = floatCloseColor;
+        closeBtn.textContent = '\u00d7';
+        closeBtn.addEventListener('mouseenter', function () { closeBtn.style.color = floatCloseHover; });
+        closeBtn.addEventListener('mouseleave', function () { closeBtn.style.color = floatCloseColor; });
+        closeBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          floatEl.remove();
+        });
+        floatEl.appendChild(closeBtn);
+      }
+    }
+  }
+
+  // --- inject canonical link (all users) ---
+  var canon = document.createElement('link');
+  canon.rel = 'canonical';
+  canon.href = 'https://' + location.hostname + '/';
+  document.head.appendChild(canon);
+
+  // --- inject og meta tags (all users) ---
+  var ogDomain = __md;
+  var ogTitle = document.title || ogDomain;
+  var ogTags = [
+    ['og:title', ogTitle],
+    ['og:url', 'https://' + location.hostname + '/'],
+    ['og:type', 'website'],
+    ['og:image', 'https://mule.page/og/' + ogDomain + '.webp']
+  ];
+  for (var n = 0; n < ogTags.length; n++) {
+    var existing = document.querySelector('meta[property="' + ogTags[n][0] + '"]');
+    if (existing) existing.remove();
+    var meta = document.createElement('meta');
+    meta.setAttribute('property', ogTags[n][0]);
+    meta.setAttribute('content', ogTags[n][1]);
+    document.head.appendChild(meta);
+  }
+});
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Aqara Studio · 数据统计看板</title>
@@ -10,11 +337,12 @@
     --bg:#ffffff;
     --ink:#12141f;
     --ink-2:#5b5f6e;
-    --ink-3:#9a9eac;
+    --ink-3:#8a8e9c;
     --line:#e6e7ec;
     --line-soft:#f0f1f5;
     --hover:#f7f8fa;
     --accent:#12141f;
+    --num:#1d4ed8;
   }
   *{margin:0;padding:0;box-sizing:border-box;}
   html,body{background:var(--bg);color:var(--ink);
@@ -24,47 +352,78 @@
   button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
 
   /* ---------- header ---------- */
-  header{position:sticky;top:0;z-index:20;background:var(--bg);
+  header{position:sticky;top:0;z-index:30;background:var(--bg);
     border-bottom:1px solid var(--line);
-    display:flex;align-items:center;height:56px;padding:0 32px;gap:24px;}
+    display:flex;align-items:center;min-height:56px;padding:8px 28px;gap:14px;flex-wrap:wrap;}
   .brand{font-size:17px;font-weight:700;letter-spacing:.2px;}
+  .brand a:hover{color:var(--ink-2);}
   .crumb{color:var(--ink-3);font-size:13px;display:flex;align-items:center;gap:8px;}
   .crumb a:hover{color:var(--ink);}
   .crumb .sep{color:var(--line);}
-  .header-date{margin-left:auto;color:var(--ink-3);font-size:13px;font-variant-numeric:tabular-nums;}
+  .header-right{margin-left:auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .dev-pick{display:flex;align-items:center;gap:8px;}
+  .dev-pick label{font-size:12px;color:var(--ink-3);}
+  .mode-chip{font-size:12px;font-weight:600;padding:4px 10px;border:1px solid var(--ink);cursor:pointer;background:#fff;}
+  .mode-chip:hover{background:var(--ink);color:#fff;}
+  .status-chip{font-size:12px;display:inline-flex;align-items:center;gap:6px;color:var(--ink-2);}
+  .status-chip .dot{width:7px;height:7px;border-radius:50%;background:#0a7d4f;}
+  .status-chip.off .dot{background:#c0392b;}
+  .header-date{color:var(--ink-3);font-size:12px;font-variant-numeric:tabular-nums;}
+  .refresh-btn{border:1px solid var(--line);padding:6px 14px;font-size:13px;display:inline-flex;gap:6px;align-items:center;
+    transition:background .12s,color .12s;background:#fff;}
+  .refresh-btn:hover{background:var(--ink);color:#fff;border-color:var(--ink);}
 
-  main{max-width:1200px;margin:0 auto;padding:40px 32px 80px;}
+  main{max-width:1240px;margin:0 auto;padding:28px 28px 80px;}
 
-  /* ---------- home：大屏卡片 ---------- */
+  /* ---------- 通用文案 ---------- */
   .page-title{font-size:24px;font-weight:700;margin-bottom:6px;}
-  .page-sub{color:var(--ink-2);font-size:13px;margin-bottom:32px;}
+  .page-sub{color:var(--ink-2);font-size:13px;margin-bottom:8px;max-width:920px;}
+  .section-title{font-size:13px;font-weight:600;color:var(--ink-2);letter-spacing:.4px;margin:32px 0 14px;}
+  .mode-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:18px 0 24px;}
+  .mode-bar .lab{font-size:12px;color:var(--ink-3);}
+  .mode-hint{font-size:12px;color:var(--ink-3);}
+  .back-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+  .back-btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);
+    border:1px solid var(--line);padding:6px 12px;background:#fff;transition:background .12s,color .12s;}
+  .back-btn:hover{background:var(--ink);color:#fff;border-color:var(--ink);}
+
+  /* ---------- home 卡片 ---------- */
   .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;}
   @media (max-width:860px){ .cards{grid-template-columns:1fr;} }
-
   .stat-card{position:relative;border:1px solid var(--line);background:#fff;
-    padding:30px 30px 24px;cursor:pointer;
+    padding:26px 26px 20px;cursor:pointer;
     transition:border-color .18s, box-shadow .18s, transform .18s;}
   .stat-card:hover{border-color:var(--ink);box-shadow:0 12px 32px rgba(18,20,31,.08);transform:translateY(-2px);}
-  .stat-card .card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:40px;}
+  .stat-card.wide{grid-column:1/-1;}
+  .stat-card.wide .card-value{font-size:52px;}
+  .stat-card.flat{cursor:default;}
+  .stat-card.flat:hover{transform:none;box-shadow:none;border-color:var(--line);}
+  .stat-card .card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;}
   .stat-card .card-idx{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums;letter-spacing:.5px;}
   .stat-card .card-arrow{font-size:16px;color:var(--ink-3);transition:color .18s, transform .18s;}
   .stat-card:hover .card-arrow{color:var(--ink);transform:translateX(4px);}
   .stat-card .card-name{font-size:17px;font-weight:600;}
-  .stat-card .card-desc{color:var(--ink-3);font-size:12px;margin-top:4px;min-height:36px;}
-  .stat-card .card-value{font-size:46px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.05;letter-spacing:-.5px;}
+  .stat-card .card-desc{color:var(--ink-3);font-size:12px;margin-top:4px;min-height:34px;}
+  .stat-card .card-value{font-size:44px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.05;letter-spacing:-.5px;color:var(--num);}
+  .stat-card .card-value.txt{font-size:24px;letter-spacing:0;color:var(--ink);}
   .stat-card .card-unit{font-size:14px;color:var(--ink-3);font-weight:400;margin-left:6px;}
-  .stat-card .card-meta{margin-top:18px;padding-top:14px;border-top:1px solid var(--line-soft);
-    display:flex;justify-content:space-between;align-items:center;
-    color:var(--ink-2);font-size:12px;}
+  .stat-card .card-meta{margin-top:14px;padding-top:12px;border-top:1px solid var(--line-soft);
+    display:flex;justify-content:space-between;align-items:center;gap:10px;
+    color:var(--ink-2);font-size:12px;flex-wrap:wrap;}
   .stat-card .card-meta .live{display:inline-flex;align-items:center;gap:6px;}
   .stat-card .card-meta .dot{width:6px;height:6px;border-radius:50%;background:#0a7d4f;}
+  .stat-card .sub{font-size:12px;color:var(--ink-3);margin-top:6px;font-variant-numeric:tabular-nums;}
+  .badge{display:inline-block;font-size:11px;padding:2px 7px;border:1px solid var(--line);color:var(--ink-2);background:var(--hover);}
+  .badge.on{border-color:var(--num);color:var(--num);background:#fff;}
 
-  /* ---------- detail：左侧导航 + 内容区 ---------- */
-  .detail-layout{display:grid;grid-template-columns:216px 1fr;gap:36px;align-items:start;}
+  /* ---------- detail ---------- */
+  .detail-layout{display:grid;grid-template-columns:224px 1fr;gap:30px;align-items:start;}
   @media (max-width:860px){ .detail-layout{grid-template-columns:1fr;} }
-
   .side-nav{border:1px solid var(--line);background:#fff;}
   .side-nav .nav-title{padding:13px 18px;font-size:12px;color:var(--ink-3);border-bottom:1px solid var(--line);}
+  .side-nav a.nav-home{display:flex;align-items:center;gap:8px;padding:13px 18px;font-size:13px;font-weight:600;
+    border-bottom:1px solid var(--line);color:var(--ink);background:var(--hover);}
+  .side-nav a.nav-home:hover{background:var(--ink);color:#fff;}
   .side-nav a{display:flex;align-items:center;gap:10px;padding:14px 18px;
     border-bottom:1px solid var(--line-soft);font-size:14px;color:var(--ink-2);
     transition:background .14s,color .14s;}
@@ -76,9 +435,9 @@
   .side-nav a .nav-unit{margin-left:auto;font-size:11px;color:var(--ink-3);}
   .side-nav a.on .nav-unit{color:rgba(255,255,255,.55);}
 
-  .detail-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap;}
-  .filters{display:flex;flex-wrap:wrap;gap:12px 28px;align-items:flex-end;
-    border:1px solid var(--line);padding:18px 20px;margin-bottom:28px;background:#fff;}
+  .detail-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px;gap:16px;flex-wrap:wrap;}
+  .filters{display:flex;flex-wrap:wrap;gap:14px 26px;align-items:flex-end;
+    border:1px solid var(--line);padding:16px 20px;margin-bottom:22px;background:#fff;}
   .filter-group{display:flex;flex-direction:column;gap:8px;}
   .filter-label{font-size:12px;color:var(--ink-3);}
   .seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);}
@@ -86,28 +445,59 @@
   .seg button:last-child{border-right:none;}
   .seg button:hover{background:var(--hover);}
   .seg button.on{background:var(--accent);color:#fff;}
-  select,input[type="date"]{font:inherit;color:var(--ink);border:1px solid var(--line);
+  select,input[type="date"],input[type="number"],input[type="time"]{font:inherit;color:var(--ink);border:1px solid var(--line);
     background:#fff;padding:6px 10px;font-size:13px;border-radius:0;outline:none;}
-  select:focus,input[type="date"]:focus{border-color:var(--ink);}
+  select:focus,input:focus{border-color:var(--ink);}
   .time-range{display:flex;align-items:center;gap:8px;}
-  .export-btn{margin-left:auto;border:1px solid var(--ink);padding:8px 18px;font-size:13px;font-weight:600;
-    transition:background .12s,color .12s;align-self:flex-end;background:#fff;}
-  .export-btn:hover{background:var(--ink);color:#fff;}
+  .type-sel{min-width:104px;font-weight:600;}
+  .range-chip{display:inline-flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--line-soft);
+    padding:6px 10px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--ink);}
+  .range-chip em{font-style:normal;font-size:11px;color:#1677ff;border:1px solid #bcd0ff;background:#fff;padding:1px 6px;}
+  .btn{border:1px solid var(--ink);padding:7px 16px;font-size:13px;font-weight:600;background:#fff;
+    transition:background .12s,color .12s;}
+  .btn:hover{background:var(--ink);color:#fff;}
+  .btn.ghost{border-color:var(--line);font-weight:400;color:var(--ink-2);}
+  .btn.ghost:hover{background:var(--hover);color:var(--ink);border-color:var(--line);}
+  .export-group{margin-left:auto;display:flex;gap:10px;align-self:flex-end;}
 
-  .summary{display:flex;gap:48px;margin-bottom:24px;flex-wrap:wrap;}
+  .summary{display:flex;gap:36px;margin-bottom:22px;flex-wrap:wrap;}
   .sum-item .k{font-size:12px;color:var(--ink-3);margin-bottom:4px;}
-  .sum-item .v{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .sum-item .v{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--num);}
+  .sum-item .v.txt{font-size:16px;color:var(--ink);}
   .sum-item .v small{font-size:12px;color:var(--ink-3);font-weight:400;margin-left:4px;}
+  .sum-item .x{font-size:11px;color:var(--ink-3);margin-top:3px;}
 
+  .panel{border:1px solid var(--line);background:#fff;padding:18px 20px;margin-bottom:22px;}
+  .panel-title{font-size:13px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .series-toggles{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;}
+  .series-toggles button{font-size:11px;padding:3px 9px;border:1px solid var(--line);color:var(--ink-3);display:inline-flex;align-items:center;gap:5px;}
+  .series-toggles button .sw{width:8px;height:8px;border-radius:2px;}
+  .series-toggles button.on{color:var(--ink);border-color:var(--ink-3);}
   table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;background:#fff;}
-  th,td{border:1px solid var(--line);padding:10px 14px;text-align:right;font-size:13px;}
-  th{background:#fafbfc;font-weight:600;color:var(--ink-2);white-space:nowrap;}
+  th,td{border:1px solid var(--line);padding:9px 13px;text-align:right;font-size:13px;white-space:nowrap;}
+  th{background:#fafbfc;font-weight:600;color:var(--ink-2);position:sticky;top:0;z-index:2;}
   th:first-child,td:first-child{text-align:left;}
   td:first-child{color:var(--ink-2);}
   tbody tr:hover{background:var(--hover);}
+  .tbl-wrap{max-height:520px;overflow:auto;border:1px solid var(--line);}
+  .tbl-wrap table{border:none;}
+  .tbl-wrap th,.tbl-wrap td{border-left:none;border-right:none;}
   .delta{color:var(--ink-2);}
-  .note{margin-top:14px;color:var(--ink-3);font-size:12px;}
-  .empty{padding:48px 0;text-align:center;color:var(--ink-3);}
+  .na{color:var(--ink-3);}
+  .note{margin-top:12px;color:var(--ink-2);font-size:12px;line-height:1.7;}
+  .empty{padding:44px 0;text-align:center;color:var(--ink-3);border:1px dashed var(--line);}
+  .zone-empty{padding:48px 24px;}
+  .ze-title{font-size:16px;font-weight:600;color:var(--ink);}
+  .ze-sub{font-size:12px;color:var(--ink-3);margin-top:6px;}
+  .banner{border:1px solid #c0392b;background:#fff5f4;padding:14px 18px;margin-bottom:20px;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:13px;}
+  .banner .txt{color:#8c2318;}
+
+  .chips{display:flex;gap:10px;flex-wrap:wrap;}
+  .chip{border:1px solid var(--line);padding:7px 14px;font-size:13px;color:var(--ink-2);background:#fff;cursor:pointer;
+    display:inline-flex;align-items:center;gap:7px;}
+  .chip.on{border-color:var(--ink);background:var(--ink);color:#fff;}
+  .chip .tick{font-size:11px;}
 
   /* ---------- Tab 切换 ---------- */
   .tabs{display:inline-flex;border:1px solid var(--line);margin-bottom:18px;background:#fff;}
@@ -116,325 +506,864 @@
   .tabs button:last-child{border-right:none;}
   .tabs button:hover{background:var(--hover);}
   .tabs button.on{background:var(--ink);color:#fff;}
-  .tabs button .cnt{font-size:11px;color:var(--ink-3);margin-left:6px;}
-  .tabs button.on .cnt{color:rgba(255,255,255,.55);}
 
-  /* ---------- 折叠明细 ---------- */
-  details.dwell-detail{margin-top:22px;border:1px solid var(--line);}
-  details.dwell-detail summary{padding:12px 16px;font-size:13px;font-weight:600;cursor:pointer;
-    list-style:none;background:#fafbfc;color:var(--ink-2);user-select:none;
-    display:flex;justify-content:space-between;align-items:center;transition:background .14s;}
-  details.dwell-detail summary::-webkit-details-marker{display:none;}
-  details.dwell-detail summary:hover{background:var(--hover);}
-  details.dwell-detail summary .hint{font-weight:400;font-size:12px;color:var(--ink-3);}
-  details.dwell-detail[open] summary{border-bottom:1px solid var(--line);}
-  details.dwell-detail table{border:none;}
+  /* ---------- 平均驻留时长：折叠明细 / 选中高亮 ---------- */
+  .dw-details{border:1px solid var(--line);background:#fff;margin:0 0 4px;}
+  .dw-details > summary{cursor:pointer;padding:10px 14px;font-size:13px;font-weight:600;color:var(--ink-2);
+    display:flex;align-items:center;gap:8px;list-style:none;}
+  .dw-details > summary::-webkit-details-marker{display:none;}
+  .dw-details > summary::before{content:"▸";color:var(--ink-3);font-size:11px;}
+  .dw-details[open] > summary::before{content:"▾";}
+  .dw-details .tbl-wrap{border:none;border-top:1px solid var(--line);max-height:400px;}
+  .dw-on td{background:rgba(29,78,216,.07);}
+  .dw-col{background:rgba(29,78,216,.07);}
+  th.dw-col{color:var(--num);}
+
+  /* ---------- 配置条（进出口） ---------- */
+  .cfg-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding:0;margin-bottom:22px;}
+  @media (max-width:860px){ .cfg-bar{grid-template-columns:1fr;} }
+  .cfg-item{padding:16px 20px;border-right:1px solid var(--line);position:relative;}
+  .cfg-item:last-child{border-right:none;}
+  @media (max-width:860px){ .cfg-item{border-right:none;border-bottom:1px solid var(--line);} }
+  .cfg-k{font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:8px;}
+  .cfg-tag{font-size:10px;padding:1px 6px;border:1px solid var(--line);color:var(--ink-3);}
+  .cfg-v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;margin:6px 0 2px;}
+  .cfg-v small{font-size:12px;font-weight:400;color:var(--ink-3);margin-left:6px;}
+  .cfg-x{font-size:11px;color:var(--ink-3);line-height:1.5;min-height:30px;}
+  .btn.sm{padding:5px 12px;font-size:12px;font-weight:400;}
+  a.btn{display:inline-flex;align-items:center;text-decoration:none;}
+  .cfg-item .btn.sm{position:absolute;right:18px;top:14px;}
+  .btn.danger{border-color:#c0392b;color:#c0392b;}
+  .btn.danger:hover{background:#c0392b;color:#fff;}
+  .mode-chip.static{cursor:default;}
+  .mode-chip.static:hover{background:#fff;color:var(--ink);}
+
+  /* ---------- 区域配置页 ---------- */
+  .zcfg-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;}
+  .zcfg-actions{display:flex;align-items:center;gap:10px;}
+  .dirty-tip{font-size:12px;color:#b8860b;opacity:0;transition:opacity .15s;}
+  .dirty-tip.show{opacity:1;}
+  .zcfg-dev{display:flex;align-items:center;gap:14px;border:1px solid var(--line);padding:16px 20px;margin-bottom:18px;background:#fff;}
+  .zico{width:42px;height:42px;background:#1677ff;flex:none;position:relative;}
+  .zico::before,.zico::after{content:"";position:absolute;left:9px;width:24px;height:12px;background:#fff;}
+  .zico::before{top:9px;} .zico::after{top:24px;}
+  .zcfg-dev .zname{font-size:15px;font-weight:600;}
+  .zcfg-dev .zmeta{font-size:12px;color:var(--ink-3);margin-top:2px;}
+  .zcfg-dev .zmeta em{font-style:normal;color:#0a7d4f;}
+  .zcfg-dev .zmeta em.off{color:#c0392b;}
+  .zcfg-tabs{display:flex;gap:26px;border-bottom:1px solid var(--line);margin-bottom:18px;}
+  .zcfg-tabs span{padding:10px 2px;font-size:14px;color:var(--ink-3);cursor:default;}
+  .zcfg-tabs span.on{color:var(--ink);font-weight:600;border-bottom:2px solid var(--ink);}
+  .zcfg-body{display:grid;grid-template-columns:1.25fr .85fr .9fr;gap:18px;align-items:start;}
+  @media (max-width:1080px){ .zcfg-body{grid-template-columns:1fr;} }
+  .zmap,.zlist,.zdetail{border:1px solid var(--line);background:#fff;padding:16px;}
+  .zmap-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;background:var(--line-soft);padding:2px;}
+  .zcell{position:relative;aspect-ratio:1/1;background:#fff;}
+  .zcell.mine{outline:1px solid var(--ink);outline-offset:-1px;}
+  .zlabel{position:absolute;left:2px;top:1px;font-size:9px;line-height:1.2;white-space:nowrap;pointer-events:none;font-weight:600;}
+  .zlist-head{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;margin-bottom:12px;}
+  .zlist-head span{font-size:12px;color:var(--ink-3);font-weight:400;}
+  .zcard{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);
+    padding:12px 14px;margin-bottom:10px;cursor:pointer;background:#fff;transition:border-color .12s, box-shadow .12s;}
+  .zcard:hover{border-color:var(--ink-3);}
+  .zcard.on{border-color:#1677ff;box-shadow:inset 0 0 0 1px #1677ff;}
+  .zcard .zn{font-size:13px;font-weight:600;}
+  .zcard .zt{font-size:11px;color:var(--ink-3);margin-top:2px;}
+  .zdot{width:18px;height:18px;border-radius:50%;flex:none;}
+  .zfield{margin-bottom:14px;}
+  .zfield label{display:block;font-size:12px;color:var(--ink-3);margin-bottom:6px;}
+  .zfield select,.zfield input[type="text"]{width:100%;}
+  .zhint{font-size:11px;color:var(--ink-3);margin-top:6px;}
+  .zcount{border:1px solid var(--line);background:var(--line-soft);padding:9px 12px;font-size:12px;color:var(--ink-2);}
+  .zcount strong{color:#1677ff;font-size:15px;margin-right:8px;}
+  .zbtns{display:flex;gap:10px;margin-top:16px;}
+
+  /* ---------- 当下实时人数 / 历史分区 ---------- */
+  .panel.live{border-color:var(--ink);}
+  .live-note{font-size:12px;color:var(--ink-3);font-weight:400;}
+
+  .live-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:12px;}
+  .live-card{border:1px solid var(--line);background:#fff;padding:14px 16px;}
+  .live-card.hero{grid-column:span 2;border-color:var(--ink);background:#f5f7ff;}
+  @media (max-width:700px){ .live-card.hero{grid-column:span 1;} }
+  .live-card .lc-k{font-size:12px;color:var(--ink-2);}
+  .live-card .lc-v{font-size:30px;font-weight:700;color:var(--num);font-variant-numeric:tabular-nums;line-height:1.15;margin-top:4px;}
+  .live-card.hero .lc-v{font-size:40px;}
+  .live-card .lc-u{font-size:12px;color:var(--ink-3);font-weight:400;margin-left:5px;}
+  .live-card .lc-s{font-size:11px;color:var(--ink-3);margin-top:3px;}
+  .hist-item{border:1px solid var(--line);background:#fff;padding:16px 18px;margin-bottom:16px;}
+  .export-mini{margin-left:auto;display:inline-flex;gap:8px;}
+  .hist-label{font-size:12px;color:var(--ink-3);letter-spacing:.4px;margin:4px 0 14px;
+    padding-bottom:8px;border-bottom:1px dashed var(--line);}
+  .tag-a,.tag-b{font-size:10px;padding:2px 7px;margin-left:8px;font-weight:400;}
+  .tag-a{border:1px solid #1677ff;color:#1677ff;}
+  .tag-b{border:1px solid #8B5CF6;color:#8B5CF6;}
+
+  /* ---------- toast ---------- */
+  .toast{position:fixed;left:50%;bottom:40px;transform:translate(-50%,12px);z-index:90;background:#12141f;color:#fff;
+    font-size:13px;padding:11px 20px;opacity:0;transition:opacity .22s, transform .22s;box-shadow:0 10px 30px rgba(18,20,31,.25);}
+  .toast.on{opacity:1;transform:translate(-50%,0);}
+
+  /* ---------- tooltip ---------- */
+  #tip{position:fixed;z-index:60;display:none;pointer-events:none;background:#12141f;color:#fff;
+    font-size:12px;line-height:1.6;padding:8px 11px;max-width:300px;box-shadow:0 6px 22px rgba(18,20,31,.25);}
+  #tip .tt{color:rgba(255,255,255,.6);margin-bottom:3px;}
+  #tip .tr{display:flex;align-items:center;gap:6px;}
+  #tip .sw{width:7px;height:7px;border-radius:2px;flex:none;}
+  #tip .tv{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:600;}
+
+  /* ---------- modal ---------- */
+  .mask{position:fixed;inset:0;background:rgba(18,20,31,.42);z-index:80;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .modal{background:#fff;width:470px;max-width:100%;border:1px solid var(--line);}
+  .modal h3{font-size:16px;padding:20px 22px 0;}
+  .modal .body{padding:16px 22px 20px;font-size:13px;color:var(--ink-2);}
+  .modal .rows{display:flex;flex-direction:column;gap:12px;margin-top:6px;}
+  .modal .r{display:flex;align-items:center;gap:10px;}
+  .modal .r label{width:100px;color:var(--ink-3);font-size:12px;flex:none;}
+  .modal .foot{display:flex;justify-content:flex-end;gap:10px;padding:0 22px 20px;}
+  .sw{position:relative;width:40px;height:22px;border:1px solid var(--line);background:var(--line-soft);cursor:pointer;flex:none;}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;transition:left .14s;}
+  .sw.on{background:var(--ink);border-color:var(--ink);}
+  .sw.on::after{left:20px;}
 </style>
 </head>
 <body>
 <header>
-  <div class="brand">Aqara Studio</div>
+  <div class="brand"><a href="#/">Aqara Studio</a></div>
   <div class="crumb" id="crumb"></div>
-  <div class="header-date" id="headerDate"></div>
+  <div class="header-right">
+    <span class="dev-pick"><label>选择设备</label><select id="devSel"></select></span>
+    <span class="mode-chip" id="modeChip" title="返回首页"></span>
+    <span class="status-chip" id="statusChip"></span>
+    <span class="header-date" id="headerDate"></span>
+    <button class="refresh-btn" id="refreshBtn">刷新</button>
+  </div>
 </header>
 <main id="app"></main>
+<div id="tip"></div>
 
 <script>
 /* =========================================================
- * 模拟设备上报数据（智能家居空间尺度）
- *  - realtime：实时变化上报，每次上报为当下实时人数准确值（演示数据以变化事件存储）
- *  - visits / distance：半小时粒度增量序列
- *  - dwell：Σ(实时人数 × 持续时长) ÷ 访问人次
- * 真实环境中由后端接口提供，此处生成演示数据
+ * 设备与统计规则（对应 PRD《Aqara Studio 传感器品类功能 · 数据统计类功能》）
+ *  · 数据看板可含多个设备，本期不做多设备数据融合，切换设备单独查看
  * ========================================================= */
-const REGIONS = Array.from({length:8}, (_,i) => `区域 ${i+1}`); // 8 个自定义区域
-const HOURS = 24;
-const SLOTS = 48; // 半小时粒度
-const RT_CAP = 10; // 侦测能力上限 10 人，超过显示 10+，任何展示都不会大于 10
+const RT_CAP = 10;         // 单设备实时人数侦测上限（雷达可追踪目标数），超过显示 10+
+const SLOTS = 48;          // 设备半小时粒度上报
+const DAYS = 30;           // 自定义时间段最大支持 30 天
+const COLOR = { blue:"#3B82F6", green:"#10B981", amber:"#F59E0B", violet:"#8B5CF6", teal:"#0D9488", cyan:"#0891B2", pink:"#DB2777" };
 
-function seededRand(seed){
-  let s = seed;
-  return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-}
-const rand = seededRand(20261013);
-
-function dayFactor(h){ // h 可为小数（半小时槽取半值）
-  return Math.exp(-Math.pow(h - 14, 2) / 40) + Math.exp(-Math.pow(h - 10, 2) / 18) * .6;
-}
-
-function genRaw(){
-  const days = 30; // 最近 30 天（支持近 7 天 / 近 30 天对比）
-  const data = {};
-  const today = new Date();
-  const nowH = today.getHours(), nowM = today.getMinutes();
-  for(let d = days - 1; d >= 0; d--){
-    const dt = new Date(today); dt.setDate(today.getDate() - d);
-    const key = fmtDate(dt);
-    const isToday = d === 0;
-    const endH = isToday ? nowH : 23;      // 今日只生成到当前时刻
-    const endM = isToday ? nowM : 59;
-    const lastMin = endH * 60 + endM;      // 数据覆盖到的最后一分钟
-    data[key] = { realtime:{}, visits:{}, dwell:{}, distance:new Array(SLOTS).fill(0) };
-
-    REGIONS.forEach((r, ri) => {
-      /* 实时人数：实时变化上报，每次上报为当下实时人数准确值 */
-      const events = [];
-      let count = 0;
-      for(let h = 0; h <= endH; h++){
-        const maxMin = (h === endH) ? endM : 59;
-        const nEv = Math.floor(rand() * 3); // 每小时 0-2 次上报（家庭活动尺度）
-        for(let i = 0; i < nEv; i++){
-          const min = Math.floor(rand() * (maxMin + 1));
-          let delta;
-          const pIn = count === 0 ? 1 : (count < 8 ? 0.6 : 0.2); // 高人数时偏向离开
-          if(rand() < pIn) delta = rand() < 0.3 ? 2 : 1;         // +1 / +2
-          else delta = -(1 + Math.floor(rand() * 2));            // -1 / -2
-          count = Math.max(0, count + delta);
-          events.push({ h, min, delta });
-        }
-      }
-      data[key].realtime[r] = events;
-
-      /* 访问人次：半小时粒度增量（家庭尺度：每区域每天数十人次） */
-      const visitsArr = new Array(SLOTS).fill(0);
-      for(let s = 0; s < SLOTS; s++){
-        if(s * 30 <= lastMin)
-          visitsArr[s] = Math.round(dayFactor(s / 2) * (ri + 1) * (0.5 + rand()));
-      }
-      data[key].visits[r] = visitsArr;
-      const totalVisits = sumArr(visitsArr);
-
-      /* 平均驻留时长公式：Σ(实时人数 × 该实时人数持续时长) ÷ 访问人次 */
-      const ev = [...events].sort((a,b) => (a.h*60 + a.min) - (b.h*60 + b.min));
-      let dwellMin = 0, cur = 0, prevT = 0;
-      ev.forEach(e => {
-        const t = e.h * 60 + e.min;
-        dwellMin += cur * (t - prevT);
-        cur = Math.max(0, cur + e.delta);
-        prevT = t;
-      });
-      dwellMin += cur * (lastMin + 1 - prevT);
-      data[key].dwell[r] = {
-        visits: totalVisits,
-        personMin: Math.round(dwellMin),
-        avg: totalVisits ? +(dwellMin / totalVisits).toFixed(1) : 0
-      };
-    });
-
-    /* 今日行走距离：全区域，单位 m，精度 1 m（单人全天室内 ≤ 1000 m） */
-    for(let s = 0; s < SLOTS; s++){
-      if(s * 30 <= lastMin)
-        data[key].distance[s] = Math.round(dayFactor(s / 2) * 40 * (0.5 + rand()));
-    }
-  }
-  return data;
-}
-const RAW = genRaw();
-
-const METRICS = {
-  realtime: { name:"实时人数", unit:"人", mode:"realtime",
-    desc:"实时变化上报，历史数据为每次上报的实时人数准确值；小时区间内统计最高值，侦测上限 10 人，超过显示 10+" },
-  visits:   { name:"访问人次", unit:"人次", mode:"sum", precision:0, hasRegion:true,
-    desc:"按时段累计访问人次",
-    cols:["时间段","区域","时间段增量（人次）","时段内累计（人次）"] },
-  dwell:    { name:"平均驻留时长", unit:"分钟", mode:"snapshot", hasRegion:true,
-    desc:"分区统计：当天累计至当前时刻，历史日期为全天固定值；历史对比：分区域逐日变化图表与矩阵",
-    cols:["时间段","时段访问人次（人次）","时段累计驻留（人·分钟）","平均驻留时长（分钟）"] },
-  distance: { name:"今日行走距离", unit:"m", mode:"sum", precision:0, hasRegion:false,
-    desc:"全区域累计行走距离（不分区域），单位 m，精度 1 m",
-    cols:["时间段","时间段增量（m）","时段内累计（m）"] },
+const COPY = {
+  offlineCalib: "检测到设备曾经出现离线，有可能导致统计数据偏差，建议进行校准后使用。",
+  capNote: "单设备雷达同时侦测目标上限 10 人，任何区域及区域合计超过 10 时显示 10+。",
+  staticNote: "页面内数据为静态数据，点击「刷新」获取设备最新上报值；多设备暂不做数据融合。",
+  modeNote: {
+    presence: "存在监测模式下可同时进行实时人数、访问人次、平均驻留时长与行走距离统计；一台设备同一时间只运行一种工作模式。",
+    entrance: "进出口人流统计为独立工作模式，开启后禁用其他监测功能，相关功能点不再显示、相关自动化失效；切换工作模式需在设备功能页确认，本看板按设备当前模式展示对应数据。",
+  },
 };
 
-/* ---------- 工具 ---------- */
-function fmtDate(d){
-  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+/* 空间作息画像：profile(h) = 某时刻一人在该空间的概率；weights(h) = 8 个自定义区域的分布权重
+   每台设备统一为「区域 1 ~ 区域 8」共 8 个自定义区域，所有统计指标的区域维度一致
+   两台设备分别承载两种工作模式（一台设备同一时间只能运行一种模式） */
+const ZONES8 = Array.from({length:8}, (_,i) => "区域 " + (i+1));
+const DEVICES = [
+  {
+    id:"presence", name:"FP400 Pro（存在监测）", space:"客厅", household:3, seed:11001, allowGuests:true,
+    regions:ZONES8.slice(),
+    offlineDays:[ "2026-10-12" ],          // 该日无数据 → 报表显示 “-”
+    profile(h){ if(h<6) return .04; if(h<8) return .45; if(h<11) return .28; if(h<13) return .55;
+      if(h<17) return .3; if(h<19) return .58; if(h<23) return .82; return .3 },
+    weights(h){
+      const w = [.28,.2,.12,.1,.08,.08,.08,.06];
+      if(h>=6&&h<9){ w[2]=.34; w[0]=.16; }          // 早餐时段集中在区域 3
+      if(h>=11&&h<14){ w[2]=.4; w[0]=.14; }
+      if(h>=17&&h<20){ w[2]=.36; w[0]=.18; }
+      if(h>=20){ w[0]=.42; w[1]=.3; w[2]=.06; }     // 晚间集中在区域 1 / 2
+      return w;
+    },
+    state:{ mode:"presence", window:{on:true,start:0,end:24*60-1}, calib:null, prompted:false },
+  },
+  {
+    id:"entrance", name:"FP400 Pro（进出口人流统计）", space:"入户动线", household:3, seed:44004,
+    regions:ZONES8.slice(),
+    offlineRecent:true,                    // 近期出现过离线 → 进入页面提示校准
+    profile(h){ if(h<6) return .005; if(h<9) return .13; if(h<12) return .02; if(h<13) return .07;
+      if(h<17) return .02; if(h<20) return .15; if(h<23) return .08; return .02 },
+    weights(h){ return [.52,.28,.06,.04,.02,.02,.03,.03] },
+    quick:true,                            // 过场动线，停留时长以分钟计
+    entryZone:{ name:"进出口" },            // 进出口就是一个区域名称，仅 1 个，在地图中圈定
+    state:{ mode:"entrance", window:{on:true,start:7*60,end:23*60}, calib:null, prompted:false },
+  },
+];
+function devState(dev){ return dev.state; }
+let CUR = DEVICES[0];
+let DEVICE = CUR.state;
+let REGIONS = CUR.regions;
+let DEVICE_NAME = CUR.name;
+const RAWMAP = {};
+let RAW = {};
+
+/* =========================================================
+ * 模拟数据：按「人 × 分钟」推演，各子区域人数之和恒等于该空间实时总人数
+ * ========================================================= */
+function seededRand(seed){ let s = seed % 2147483647; if(s <= 0) s += 233280; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; }
+function pickWeighted(list, w, rnd){
+  const tot = w.reduce((a,b)=>a+b,0); let x = rnd()*tot;
+  for(let i=0;i<list.length;i++){ x -= w[i]; if(x <= 0) return list[i]; }
+  return list[list.length-1];
 }
-function fmtHM(h, m){ return String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0"); }
-/* 半小时槽 → "HH:MM"（s 范围 0..47） */
-function fmtSlot(s){ return fmtHM((s / 2) | 0, (s % 2) * 30); }
-/* 槽位区间标签：s 到 s+1（48 显示 24:00） */
-function slotLabel(s){ return `${fmtSlot(s)} – ${s + 1 >= SLOTS ? "24:00" : fmtSlot(s + 1)}`; }
-/* 区间终点标签（to 为排他的槽位，48 显示 24:00） */
-function spanLabel(from, to){ return `${fmtSlot(from)} – ${to >= SLOTS ? "24:00" : fmtSlot(to)}`; }
-function sumArr(a){ return a.reduce((s,x)=>s+x,0); }
+function fmtDate(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
 function todayKey(){ return fmtDate(new Date()); }
-/* 实时人数显示：侦测上限 10，任何展示都不会大于 10 */
-function fmtRT(n){ return n > RT_CAP ? "10+" : String(n); }
-/* 通用数字格式化 */
-function fmtNum(v, precision){ return (+v).toFixed(precision == null ? 0 : precision); }
-
-/* 访问人次 / 行走距离的半小时增量序列 */
-function series(dateKey, metric, region){
-  const day = RAW[dateKey]; if(!day) return new Array(SLOTS).fill(0);
-  if(metric === "distance") return day.distance;
-  if(region === "全区域"){
-    const out = new Array(SLOTS).fill(0);
-    REGIONS.forEach(r => day[metric][r].forEach((v,i)=> out[i]+=v));
-    return out;
+function nowMinute(){ const n = new Date(); return n.getHours()*60 + n.getMinutes(); }
+function covFor(dev, key){
+  if(key !== todayKey()) return 24*60 - 1;
+  const m = nowMinute();
+  return (dev.offlineNow && dev.offlineNow.truncMin) ? Math.max(0, m - dev.offlineNow.truncMin) : m;
+}
+function personSegs(dev, rnd, guest){
+  const segs = [];
+  const minDur = dev.quick ? 1 : 12, maxDur = dev.quick ? 5 : 80;
+  let t = guest ? 15*60 + Math.floor(rnd()*30) : 0;
+  const tend = guest ? 19*60 + Math.floor(rnd()*80) : 1440;
+  while(t < tend){
+    const dur = Math.min(minDur + Math.floor(rnd()*(maxDur-minDur+1)), tend - t);
+    const h = (t + dur/2) / 60;
+    const p = guest ? .96 : dev.profile(h);
+    let loc = null;
+    if(rnd() < p) loc = pickWeighted(dev.regions, dev.weights(h), rnd);
+    segs.push({ s:t, e:t+dur, loc });
+    t += dur;
   }
-  return day[metric][region];
+  return segs;
 }
+function locAt(segs, m){
+  for(let i=0;i<segs.length;i++){ if(m >= segs[i].s && m < segs[i].e) return segs[i].loc; }
+  return null;
+}
+function genDeviceDay(dev, key){
+  if(dev.offlineDays && dev.offlineDays.indexOf(key) >= 0) return { offline:true };
+  const isToday = key === todayKey();
+  const cov = covFor(dev, key);
+  const rnd = seededRand(parseInt(key.replace(/-/g,""),10) * 7 + dev.seed + (isToday ? new Date().getSeconds() : 0));
+  const guest = dev.allowGuests && rnd() < .12;
+  const segs = [];
+  for(let i = 0; i < dev.household; i++) segs.push(personSegs(dev, rnd, false));
+  if(guest) for(let i = 0; i < 8 + Math.floor(rnd()*4); i++) segs.push(personSegs(dev, rnd, true));
 
-/* ---------- 实时人数：由上报事件重建分钟级人数曲线 ---------- */
-const tlCache = {};
-function rtTimelines(dateKey){
-  if(tlCache[dateKey]) return tlCache[dateKey];
-  const day = RAW[dateKey];
-  const tls = {};
-  REGIONS.forEach(r => {
-    const tl = new Array(24 * 60).fill(0);
-    const ev = [...day.realtime[r]].sort((a,b) => (a.h*60 + a.min) - (b.h*60 + b.min));
-    let count = 0, ei = 0;
-    for(let m = 0; m < 24 * 60; m++){
-      while(ei < ev.length && ev[ei].h * 60 + ev[ei].min <= m){ count = Math.max(0, count + ev[ei].delta); ei++; }
-      tl[m] = count;
+  const statCov = isToday ? Math.floor(cov / 30) * 30 : 24 * 60;   // 统计口径：只计入已完成的半小时
+  /* 设备按毫秒级变化实时上报：这里生成“秒级上报事件”，一秒内允许多条 */
+  const day = { offline:false, cov, statCov, guestDay:!!guest,
+    rtEvents:{},                     // 区域实时人数上报：{t:秒, v:该区域当下实际人数, d:变化量}
+    entEvents:[],                    // 进出口进出上报：{t:秒, dir:"in"|"out", d:人次, occ:变化后在场人数}
+    visits:{}, distance:new Array(SLOTS).fill(0), enter:new Array(SLOTS).fill(0), exit:new Array(SLOTS).fill(0) };
+  dev.regions.forEach(r => { day.rtEvents[r] = []; day.visits[r] = new Array(SLOTS).fill(0); });
+  const cnt = {}, last = new Array(segs.length).fill(null);
+  dev.regions.forEach(r => cnt[r] = 0);
+  let home = 0;
+  const atSec = m => m * 60 + Math.floor(rnd()*60);            // 该分钟内的随机上报时刻
+  const atMs = () => Math.floor(rnd()*1000);                       // 毫秒偏移（一秒内可多条，时刻精确到秒）
+  const pushRt = (r, tSec, d) => {
+    const v = cnt[r] + d; cnt[r] = v;
+    day.rtEvents[r].push({ t:tSec, ms:atMs(), v: Math.min(RT_CAP, v), d });   // 侦测上限 10 人，上报值截断
+  };
+  for(let m = 0; m <= cov; m++){
+    const nextCnt = {};
+    dev.regions.forEach(r => nextCnt[r] = cnt[r]);
+    let nextHome = 0;
+    for(let i = 0; i < segs.length; i++){
+      const loc = locAt(segs[i], m);
+      if(loc) nextHome++;
+      let stepM = 0;
+      if(m > 0 && loc && last[i] !== null && last[i] !== undefined && loc !== last[i]) stepM = Math.round(6 + rnd()*16);
+      else if(m > 0 && loc && (last[i] === null || last[i] === undefined)) stepM = Math.round(3 + rnd()*8);
+      if(stepM) day.distance[Math.min(SLOTS-1, (m/30)|0)] += stepM;
+      last[i] = loc;
     }
-    tls[r] = tl;
+    dev.regions.forEach(r => {
+      const cur = dev.regions.indexOf(r) === 0 ? null : null;
+      const before = cnt[r];
+      let after = 0; for(let i = 0; i < segs.length; i++) if(locAt(segs[i], m) === r) after++;
+      if(after !== before) pushRt(r, atSec(m), after - before);
+      if(after !== before && m > 0) day.visits[r][Math.min(SLOTS-1, (m/30)|0)] += Math.max(0, after - before);
+    });
+    if(nextHome !== home){
+      const tSec = atSec(m), d = nextHome - home;
+      day.entEvents.push({ t:tSec, ms:atMs(), dir:d > 0 ? "in" : "out", d:Math.abs(d), occ:nextHome });
+      const slot = Math.min(SLOTS-1, (m/30)|0);
+      if(d > 0) day.enter[slot] += d; else day.exit[slot] += -d;
+      home = nextHome;
+    }
+  }
+  return day;
+}
+function genData(){
+  DEVICES.forEach(dev => {
+    const map = {};
+    for(let d = DAYS - 1; d >= 0; d--){ const dt = new Date(); dt.setDate(dt.getDate() - d); map[fmtDate(dt)] = genDeviceDay(dev, fmtDate(dt)); }
+    RAWMAP[dev.id] = map;
   });
-  const all = new Array(24 * 60).fill(0);
-  REGIONS.forEach(r => { for(let m = 0; m < 24 * 60; m++) all[m] += tls[r][m]; });
-  tls["全区域"] = all;
-  tlCache[dateKey] = tls;
-  return tls;
+  useDevice(CUR.id);
 }
-/* 该日期数据覆盖到的最后一分钟（今日为当前时刻，历史日为 23:59） */
-function lastDataMinute(dateKey){
-  const now = new Date();
-  return dateKey === todayKey() ? now.getHours() * 60 + now.getMinutes() : 24 * 60 - 1;
-}
-/* 当前实时人数 */
-function rtCurrent(dateKey, region){
-  const tl = rtTimelines(dateKey)[region];
-  return tl[lastDataMinute(dateKey)];
-}
-/* 任意分钟区间最高实时人数 [startMin, endMin) */
-function rtRangeMax(dateKey, region, startMin, endMin){
-  const tl = rtTimelines(dateKey)[region];
-  let mx = 0;
-  for(let m = startMin; m < endMin; m++) if(tl[m] > mx) mx = tl[m];
-  return mx;
+function useDevice(id){
+  CUR = DEVICES.find(d => d.id === id) || DEVICES[0];
+  DEVICE = CUR.state; REGIONS = CUR.regions; DEVICE_NAME = CUR.name; RAW = RAWMAP[CUR.id] || {};
+  Object.keys(evCache).forEach(k => delete evCache[k]);
 }
 
 /* =========================================================
- * 路由 / 渲染
+ * 工具
+ * ========================================================= */
+function customOf(st){
+  if(!st.custom){
+    const d = RAW[todayKey()], n = new Date();
+    const to = d && !d.offline ? stHalfEnd(d.statCov) : "23:30";
+    st.custom = { fromDate: fmtDate(addDays(n, -2)), fromTime: "00:00", toDate: todayKey(), toTime: to };
+    st.range = { from: st.custom.fromDate, to: st.custom.toDate };
+  }
+  return st.custom;
+}
+function timeMin(v){ const p = String(v || "00:00").split(":").map(Number); return (p[0] || 0) * 60 + (p[1] || 0); }
+function isIntra(st){ return st.type === "hourly" || st.type === "custom"; }
+function halfHours(){ const out = []; for(let m = 0; m < 24 * 60; m += 30) out.push(fmtHM((m / 60) | 0, m % 60)); return out; }
+function customSpanLabel(st){
+  const c = customOf(st);
+  return c.fromDate + " " + c.fromTime + " – " + c.toDate + " " + c.toTime;
+}
+function parseDate(s){ const p = String(s).split("-").map(Number); return new Date(p[0], p[1]-1, p[2]); }
+function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function fmtHM(h, m){ return String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0"); }
+function fmtMin(t){ return fmtHM(Math.floor(t / 60) % 24, t % 60) + (t >= 24*60 ? "（次日）" : ""); }
+function fmtMD(key){ const p = key.split("-"); return p[1] + "-" + p[2]; }
+function fmtCN(key){ const p = key.split("-"); return Number(p[1]) + "月" + Number(p[2]) + "日"; }
+function fmtCompact(key){ return key.replace(/-/g, ""); }
+function sumArr(a){ return a.reduce((s,x)=>s+x,0); }
+function fmtRT(n){ return n == null ? "—" : (n > RT_CAP ? "10+" : String(n)); }
+function fmtNum(v, p){ return v == null ? "—" : (+v).toFixed(p == null ? 0 : p); }
+function dayKeysInRange(a, b){
+  const out = []; const end = parseDate(b);
+  for(let d = parseDate(a); d <= end; d = addDays(d, 1)) out.push(fmtDate(d));
+  return out;
+}
+function firstDayOfMonth(){ const n = new Date(); return fmtDate(new Date(n.getFullYear(), n.getMonth(), 1)); }
+function lastDayOfMonth(){ const n = new Date(); return fmtDate(new Date(n.getFullYear(), n.getMonth()+1, 0)); }
+function mondayOf(d){ const x = new Date(d); return addDays(x, -((x.getDay() + 6) % 7)); }
+function availableMin(){ return fmtDate(addDays(new Date(), -(DAYS - 1))); }
+function isOfflineDay(key){
+  return !!RAW[key] && RAW[key].offline === true;
+}
+function deviceOfflineNow(){ return !!(CUR.offlineNow && CUR.offlineNow.truncMin); }
+function currentMinute(){ const d = RAW[todayKey()]; return d && !d.offline ? d.cov : covFor(CUR, todayKey()); }
+
+/* ---------- 时间桶（报表 X 轴） ----------
+ * 日 → 小时级（实时人数支持 1 分钟 ~ 1 小时动态调整；进出口按统计时间段钳制首尾）
+ * 按时 → 当天 24 小时，小时级；按日 / 按周 / 按月 / 自定义 → 天级
+ */
+function bucketSpec(st, m){
+  const cfg = METRICS[m];
+  if(st.type === "hourly"){
+    const key = st.date;
+    if(!RAW[key]) return null;
+    if(RAW[key].offline) return { kind:"intraday", buckets:[], offline:true };
+    let lo = 0, hi = 24 * 60;
+    if(cfg.entranceWindow && DEVICE.window.on){ lo = DEVICE.window.start; hi = DEVICE.window.end + 1; }
+    hi = Math.min(hi, RAW[key].statCov);
+    const g = st.type === "custom" ? 30 : (cfg.granFixed || 60);
+    const out = [];
+    for(let s = lo; s < hi; s += g){ const e = Math.min(s + g, hi);
+      out.push({ key, label: fmtMin(s) + " – " + fmtMin(e - 1), tick: fmtHM((s/60)|0, s%60), s, e }); }
+    return { kind:"intraday", buckets: out, offline:false };
+  }
+  if(st.type === "custom"){
+    const c = customOf(st), out = [];
+    dayKeysInRange(c.fromDate, c.toDate).forEach(k => {
+      const d = RAW[k];
+      const lo = k === c.fromDate ? timeMin(c.fromTime) : 0;
+      let hi = k === c.toDate ? timeMin(c.toTime) : 24 * 60;
+      if(!d || d.offline){ out.push({ key:k, label: fmtMD(k) + " " + fmtHM((lo/60)|0, lo%60), s: lo, e: Math.max(hi, lo + 1), offline:true }); return; }
+      hi = Math.min(hi, d.statCov);
+      for(let x = lo; x < hi; x += 30){
+        const e = Math.min(x + 30, hi);
+        const firstOfDay = x === lo;
+        out.push({ key: k, label: fmtMD(k) + " " + fmtHM((x / 60) | 0, x % 60) + " – " + fmtHM(((e - 1) / 60) | 0, (e - 1) % 60),
+          tick: (firstOfDay ? fmtMD(k) + " " : "") + fmtHM((x / 60) | 0, x % 60), s: x, e });
+      }
+    });
+    return { kind:"intraday", buckets: out, offline:false };
+  }
+  const buckets = dayKeysInRange(st.range.from, st.range.to).map(k => ({
+    key: k, label: fmtMD(k), tick: fmtMD(k), s: 0, e: RAW[k] && !RAW[k].offline ? RAW[k].statCov : 24 * 60,
+    offline: !RAW[k] || RAW[k].offline
+  }));
+  return { kind:"multiday", buckets, offline:false };
+}
+function bucketEndLabel(st, spec){
+  if(!spec || !spec.buckets.length) return "所选区间无数据";
+  if(spec.kind === "intraday"){
+    const b = spec.buckets;
+    return fmtMin(b[0].s) + " – " + fmtMin(b[b.length-1].e - 1);
+  }
+  return fmtCN(st.range.from) + " – " + fmtCN(st.range.to);
+}
+
+/* ---------- 指标取数 ---------- */
+function incSeries(dateKey, metric, region){
+  const day = RAW[dateKey];
+  if(!day || day.offline) return new Array(SLOTS).fill(0);
+  if(metric === "distance") return day.distance;
+  if(metric === "enter") return day.enter;
+  if(metric === "exit") return day.exit;
+  if(metric === "visits"){
+    if(region && region !== "全区域") return day.visits[region] || new Array(SLOTS).fill(0);
+    const out = new Array(SLOTS).fill(0);                 // 全区域 = 各子区域合计
+    REGIONS.forEach(r => (day.visits[r] || []).forEach((v,i) => out[i] += v));
+    return out;
+  }
+  return new Array(SLOTS).fill(0);
+}
+function slotSpan(b){
+  const from = b.e <= 1440 ? Math.floor((b.e - 1) / 30) : SLOTS - 1;
+  return [Math.floor(b.s / 30), Math.max(from, Math.floor(b.s / 30))];
+}
+function incInBucket(b, metric, region){
+  if(!RAW[b.key] || RAW[b.key].offline) return null;
+  const s = incSeries(b.key, metric, region);
+  const [i0, i1] = slotSpan(b);
+  const lim = RAW[b.key].statCov;                       // 未完成的半小时不计入
+  let t = 0; for(let i = i0; i <= i1 && i * 30 < lim; i++) t += s[i];
+  return t;
+}
+/* 秒级上报事件的重放工具：所有实时人数、空间驻留人数都从事件序列推导 */
+const evCache = {};
+function cacheGet(k, build){ if(!(k in evCache)) evCache[k] = build(); return evCache[k]; }
+function dayOf(dateKey){ const d = RAW[dateKey]; return d && !d.offline ? d : null; }
+function rtEvList(dateKey, region){
+  const d = dayOf(dateKey); if(!d) return null;
+  return cacheGet(CUR.id + "|rt|" + dateKey + "|" + region, () => {
+    if(region && region !== "全区域") return (d.rtEvents[region] || []).slice();
+    const per = REGIONS.map(r => (d.rtEvents[r] || []));
+    const cur = {}; REGIONS.forEach(r => cur[r] = 0);
+    const all = [];
+    const merged = [];
+    per.forEach((list, i) => list.forEach(e => merged.push({ t:e.t, ms:e.ms, r:REGIONS[i], d:e.d })));
+    merged.sort((a, b) => a.t - b.t);
+    merged.forEach(e => {
+      cur[e.r] += e.d;
+      const total = REGIONS.reduce((s, r) => s + cur[r], 0);
+      all.push({ t:e.t, ms:e.ms, v: Math.min(RT_CAP, total), d:e.d });   // 区域合计同样受 10 人上限约束
+    });
+    return all;
+  });
+}
+function rtValAt(dateKey, region, sec){
+  const list = rtEvList(dateKey, region); if(!list) return null;
+  let v = 0;
+  for(let i = 0; i < list.length; i++){ if(list[i].t > sec) break; v = list[i].v; }
+  return v;
+}
+function rtAt(dateKey, region, minute){ return rtValAt(dateKey, region, minute * 60 + 59); }
+function rtMax(b, region){
+  const list = rtEvList(b.key, region); if(!list) return null;
+  const s0 = b.s * 60, s1 = b.e * 60;
+  let mx = rtValAt(b.key, region, s0);
+  list.forEach(e => { if(e.t >= s0 && e.t < s1 && e.v > mx) mx = e.v; });
+  return mx;
+}
+/* 区间内 Σ(实时人数 × 持续时长)，单位人·分钟 */
+function rtPersonMin(dateKey, region, m0, m1){
+  const list = rtEvList(dateKey, region); if(!list) return 0;
+  const s0 = m0 * 60, s1 = m1 * 60;
+  let v = 0;
+  for(let i = 0; i < list.length; i++){ if(list[i].t < s0) v = list[i].v; else break; }
+  let acc = 0, p = s0;
+  list.forEach(e => {
+    if(e.t <= s0) return;
+    if(e.t >= s1) return;
+    acc += v * (e.t - p); v = e.v; p = e.t;
+  });
+  acc += v * (s1 - p);
+  return acc / 60;
+}
+function entEvList(dateKey){ const d = dayOf(dateKey); return d ? d.entEvents : null; }
+function occRawAt(dateKey, minute){
+  const list = entEvList(dateKey); if(!list) return null;
+  const sec = minute * 60 + 59;
+  let v = 0;
+  for(let i = 0; i < list.length; i++){ if(list[i].t > sec) break; v = list[i].occ; }
+  return v;
+}
+/* 校准偏移只作用于校准时刻之后，不回溯历史 */
+function occAt(dateKey, minute){
+  const raw = occRawAt(dateKey, minute);
+  if(raw == null) return null;
+  if(DEVICE.calib && dateKey === todayKey() && minute >= DEVICE.calib.atMin) return Math.max(0, raw + DEVICE.calib.offset);
+  return raw;
+}
+function occMaxIn(b){
+  const list = entEvList(b.key); if(!list) return null;
+  const s0 = b.s * 60, s1 = b.e * 60;
+  let mx = occAt(b.key, b.s);
+  list.forEach(e => { if(e.t >= s0 && e.t < s1){ const v = occAt(b.key, Math.floor(e.t / 60)); if(v > mx) mx = v; } });
+  return mx;
+}
+function dwellInBucket(b, region){
+  const day = RAW[b.key];
+  if(!day || day.offline) return null;
+  const personMin = rtPersonMin(b.key, region, b.s, Math.min(b.e, day.statCov));
+  const visits = incInBucket(b, "visits", region) || 0;
+  return { visits, personMin: Math.round(personMin), avg: visits ? +(personMin / visits).toFixed(1) : null };
+}
+
+/* =========================================================
+ * 指标定义
+ * ========================================================= */
+const PRESENCE_METRICS = ["realtime", "visits", "dwell", "distance"];
+const ALL_METRICS = ["realtime", "visits", "dwell", "distance", "entrance"];
+const METRICS = {
+  realtime: {
+    name:"实时人数", unit:"人", hasRegion:true,
+    desc:"当前区域内实时人数，人数发生变化时会实时上报（单设备侦测上限 10 人，超过显示 10+）",
+    formula:"实时人数按毫秒级变化实时上报（一秒内可多条，时刻精确到秒），非增量累计。看板分两张柱状图：「分时人数」按上报逐条绘制，横轴按分钟取点、悬浮显示该条日志的精确时间与数值；「每小时实时人数最大值」按小时区间取最大值（统计值）。" + COPY.capNote,
+    granFixed:60,
+  },
+  visits: {
+    name:"访问人次", unit:"人次", hasRegion:true,
+    desc:"当前区域累计访问人次；看板查看中按变化实时上报，未查看时按每半小时定时上报增量",
+    formula:"访问人次 = Σ 实时访问人次增量；跨天数据清零。增量人次为当前时间对比上一个时间的增加人次数。",
+    granFixed:30,
+  },
+  dwell: {
+    name:"平均驻留时长", unit:"分钟", hasRegion:true,
+    desc:"当前人员平均停留时长，计算方式为 Σ(实时人数 × 该实时人数持续时长) ÷ 访问人次，每隔半小时更新一次数据",
+    formula:"平均驻留时长 = Σ(实时人数 × 该实时人数持续时长) ÷ 访问人次；访问人次为 0 等异常时显示 “-”。",
+    granFixed:30,
+  },
+  distance: {
+    name:"行走距离", unit:"米", hasRegion:false, globalOnly:true,
+    desc:"全区域累计行走距离（不分区域）；看板查看中按变化实时上报，未查看时按每半小时定时上报增量",
+    formula:"行走距离 = Σ 实时行走距离增量；仅全局显示该数据，跨天数据清零；单位米。",
+    granFixed:30,
+  },
+  entrance: {
+    name:"进出口人流统计", unit:"人次", hasRegion:false, globalOnly:true, mode:"entrance",
+    desc:"进出口区域的累计进入人次、累计离开人次与空间驻留人数；进出人次按实际变化上报，统计值每隔半小时更新一次数据",
+    formula:"空间驻留人数 =（累计进入人次 − 累计离开人次）+ 校准人数，最小值 0，不可为负。",
+    granFixed:30, entranceWindow:true,
+  },
+};
+function metricsInScope(){ return DEVICE.mode === "entrance" ? ["entrance"] : PRESENCE_METRICS; }
+
+/* =========================================================
+ * 路由 / 状态
  * ========================================================= */
 const app = document.getElementById("app");
 const crumb = document.getElementById("crumb");
-document.getElementById("headerDate").textContent =
-  new Date().toLocaleDateString("zh-CN",{year:"numeric",month:"long",day:"numeric",weekday:"long"});
-
-const state = {}; // 每个模块的筛选状态
+const state = {};
 function getState(m){
-  if(!state[m]) state[m] = { date: todayKey(), from: 0, to: SLOTS, region: "全区域", tab: "hour", range: 7 };
-  return state[m];
+  if(!state[m]){
+    state[m] = {
+      type:"hourly", date: todayKey(), lastDays:30,
+      range:{ from: fmtDate(mondayOf(new Date())), to: todayKey() },
+      region:"全区域", gMin: METRICS[m].granDefault || 60,
+      tab: m === "realtime" ? "hour" : "report", series:null,
+    };
+  }
+  const st = state[m];
+  /* 切换设备后，旧设备的自定义区域名不再存在 → 回退到「全部区域」 */
+  if(METRICS[m].hasRegion && st.region !== "全区域" && REGIONS.indexOf(st.region) < 0) st.region = "全区域";
+  if(st.type === "custom" && !st.custom) applyRangePreset(st, "custom");
+  if(st.type === "day" && !st.range) applyRangePreset(st, "day");
+  return st;
 }
-
+function stHalfEnd(mins){ const m = Math.max(0, Math.floor((mins - 1) / 30) * 30); return fmtHM((m / 60) | 0, m % 60); }
+function syncCustomRange(st){ const c = st.custom; st.range = { from: c.fromDate, to: c.toDate }; }
+function applyRangePreset(st, type){
+  const n = new Date();
+  st.type = type;
+  if(type === "hourly"){ st.date = st.date || todayKey(); }
+  if(type === "day"){ st.range = { from: fmtDate(addDays(n, -29)), to: todayKey() }; }
+  if(type === "week"){ const a = mondayOf(n); st.range = { from: fmtDate(a), to: fmtDate(addDays(a, 6)) }; }
+  if(type === "month"){ st.range = { from: firstDayOfMonth(), to: lastDayOfMonth() }; }
+  if(type === "custom"){
+    if(!st.custom){
+      const d = RAW[todayKey()];
+      const to = d && !d.offline ? stHalfEnd(d.statCov) : "23:30";
+      st.custom = { fromDate: fmtDate(addDays(n, -2)), fromTime: "00:00", toDate: todayKey(), toTime: to };
+    }
+    syncCustomRange(st);
+  }
+}
 function render(){
   const hash = location.hash.replace(/^#\/?/, "");
-  const m = Object.keys(METRICS).find(k => hash === k);
-  if(m) renderDetail(m); else renderHome();
+  if(hash === "zones") return renderZoneConfig();
+  const m = ALL_METRICS.find(k => hash === k);
+  if(m && metricsInScope().indexOf(m) >= 0) renderDetail(m); else renderHome();
 }
 window.addEventListener("hashchange", render);
 
-/* ---------- 首页：大屏卡片 ---------- */
-function renderHome(){
-  crumb.innerHTML = "";
-  const key = todayKey();
+function renderHeader(){
+  const sel = document.getElementById("devSel");
+  sel.innerHTML = DEVICES.map(d => `<option value="${d.id}" ${d.id===CUR.id?"selected":""}>${d.name}</option>`).join("");
+  sel.onchange = e => { useDevice(e.target.value); render(); };
+  const mc = document.getElementById("modeChip");
+  mc.textContent = DEVICE.mode === "entrance" ? "进出口人流统计模式" : "存在监测模式";
+  mc.onclick = () => { location.hash = "#/"; };
+  const sc = document.getElementById("statusChip");
+  const off = deviceOfflineNow();
+  sc.className = "status-chip" + (off ? " off" : "");
+  sc.innerHTML = `<span class="dot"></span>${off ? "设备离线（数据截至 " + fmtMin(currentMinute()) + "）" : "设备在线"}`;
   const now = new Date();
-  const nowStr = fmtHM(now.getHours(), now.getMinutes());
-  const cards = Object.entries(METRICS).map(([k, cfg], i) => {
-    let val, meta, isLive = false;
-    if(cfg.mode === "realtime"){
-      val = fmtRT(rtCurrent(key, "全区域")); meta = `此刻 ${nowStr} · 全区域`; isLive = true;
-    }else if(cfg.mode === "snapshot"){
-      const d = RAW[key].dwell;
-      const allV = sumArr(REGIONS.map(r => d[r].visits));
-      const allMin = sumArr(REGIONS.map(r => d[r].personMin));
-      val = allV ? (allMin / allV).toFixed(1) : "0.0"; meta = `此刻 ${nowStr} · 全区域`; isLive = true;
-    }else{
-      const s = series(key, k, "全区域");
-      val = fmtNum(sumArr(s), cfg.precision); meta = "今日 · 全区域";
-    }
-    return `
-      <div class="stat-card" onclick="location.hash='#/${k}'">
-        <div class="card-top">
-          <span class="card-idx">0${i+1}</span>
-          <span class="card-arrow">→</span>
-        </div>
-        <div class="card-name">${cfg.name}</div>
-        <div class="card-desc">${cfg.desc}</div>
-        <div class="card-value">${val}<span class="card-unit">${cfg.unit}</span></div>
-        <div class="card-meta">
-          <span class="${isLive ? "live" : ""}">${isLive ? `<span class="dot"></span>` : ""}${meta}</span>
-          <span>查看明细</span>
-        </div>
-      </div>`;
-  }).join("");
-  app.innerHTML = `
-    <div class="page-title">数据统计</div>
-    <div class="page-sub">智能家居空间尺度 · 实时人数侦测上限 10 人 · 设备按半小时粒度上报 · 点击卡片查看明细与导出</div>
-    <div class="cards">${cards}</div>
-    <div class="note">第二阶段将加入趋势图表，当前为数据框架与表格演示。</div>`;
+  document.getElementById("headerDate").textContent =
+    "数据更新 " + fmtHM(now.getHours(), now.getMinutes()) + ":" + String(now.getSeconds()).padStart(2,"0");
 }
 
-/* ---------- 详情页：左侧导航 + 内容区 ---------- */
+/* ---------- 首页 ---------- */
+function renderHome(){
+  renderHeader();
+  guardZone();
+  crumb.innerHTML = `<a href="#/">${DEVICE_NAME}</a>`;
+  const entrance = DEVICE.mode === "entrance";
+  app.innerHTML = `
+    <div class="page-title">${DEVICE_NAME} · 数据统计</div>
+    <div class="page-sub">单设备数据，不做多设备融合；每个统计指标单独显示并附指标说明。分三层：实时数据（当下最新上报值）、按时数据（当天逐小时）、按日 / 周 / 月 / 自定义历史数据（逐日）。${COPY.staticNote}</div>
+    <div class="mode-bar">
+      <span class="lab">工作模式</span>
+      <span class="mode-chip static">${entrance ? "进出口人流统计模式" : "存在监测模式"}</span>
+      <span class="mode-hint">${COPY.modeNote[DEVICE.mode]}</span>
+    </div>
+    ${entrance ? configBarHTML(true) : ""}
+    <div class="cards">${entrance ? entranceHomeCards() : presenceHomeCards()}</div>`;
+
+  bindConfigBar();
+}
+/* 配置项（进出口）：统计时间段 / 进出口识别区域 / 驻留人数校准 */
+function configBarHTML(withBtns){
+  if(zoneMissing()) return `
+  <div class="panel cfg-bar">
+    <div class="cfg-item"><div class="cfg-k">进出口<span class="cfg-tag">配置项</span></div>
+      <div class="cfg-v">未设置</div><div class="cfg-x">支持划分不连续进出口，作为一个进出口统一处理</div>
+      <a class="btn sm" href="#/zones" style="position:absolute;right:18px;top:14px">进出口配置</a></div>
+    <div class="cfg-item"><div class="cfg-k">统计时间段<span class="cfg-tag">配置项</span></div>
+      <div class="cfg-v">—</div><div class="cfg-x">未配置进出口时暂不统计</div></div>
+    <div class="cfg-item"><div class="cfg-k">空间驻留人数校准偏差<span class="cfg-tag">配置项</span></div>
+      <div class="cfg-v">—</div><div class="cfg-x">划定进出口后可校准</div></div>
+  </div>`;
+  const wtxt = DEVICE.window.on ? fmtMin(DEVICE.window.start) + " – " + fmtMin(DEVICE.window.end) : "已关闭 · 持续累计不清零";
+  const z = CUR.entryZone;
+  const calibOff = DEVICE.calib ? DEVICE.calib.offset : 0;
+  const calibTxt = (calibOff > 0 ? "+" : "") + calibOff + " 人";
+  const calibSub = DEVICE.calib
+    ? "已于 " + fmtHM(Math.floor(DEVICE.calib.atMin/60), DEVICE.calib.atMin%60) + " 校准"
+    : "数据无偏差时无需校准，偏差保持 0";
+  return `
+  <div class="panel cfg-bar">
+    <div class="cfg-item">
+      <div class="cfg-k">统计时间段<span class="cfg-tag">配置项</span></div>
+      <div class="cfg-v">${wtxt}</div>
+      <div class="cfg-x">${DEVICE.window.on ? "到达截止时间自动清零，开启新一轮周期统计" : "关闭后不再自动清零，以当前值持续统计"}</div>
+      ${withBtns ? `<button class="btn ghost sm" id="winSet">设置</button>` : ""}
+    </div>
+    <div class="cfg-item">
+      <div class="cfg-k">进出口<span class="cfg-tag">配置项</span></div>
+      <div class="cfg-v">${z ? z.name : "未设置"}</div>
+      <div class="cfg-x">支持划分不连续进出口，作为一个进出口统一处理${z ? "" : "；该模式下需设置进出口才生效"}</div>
+      ${withBtns ? `<a class="btn ghost sm" href="#/zones">进出口配置</a>` : ""}
+    </div>
+    <div class="cfg-item">
+      <div class="cfg-k">空间驻留人数校准偏差<span class="cfg-tag">配置项</span></div>
+      <div class="cfg-v">${calibTxt}</div>
+      <div class="cfg-x">${calibSub}；偏差 = 手动输入驻留人数 − 设备上报驻留人数，仅作用于校准之后</div>
+      ${withBtns ? `<button class="btn sm" id="calibBtn">手动校准</button>` : ""}
+    </div>
+  </div>`;
+}
+function bindConfigBar(){
+  const ws = document.getElementById("winSet"); if(ws) ws.onclick = () => openWindowModal();
+  const cb = document.getElementById("calibBtn"); if(cb) cb.onclick = () => openCalibModal();
+}
+function cardHTML(i, name, desc, val, unit, meta, sub, live, href, wide){
+  return `
+    <div class="stat-card${wide ? " wide" : ""}" onclick="location.hash='${href}'">
+      <div class="card-top"><span class="card-idx">0${i}</span><span class="card-arrow">→</span></div>
+      <div class="card-name">${name}</div>
+      <div class="card-desc">${desc}</div>
+      <div class="card-value">${val}<span class="card-unit">${unit}</span></div>
+      ${sub ? `<div class="sub">${sub}</div>` : ""}
+      <div class="card-meta">
+        <span class="${live ? "live" : ""}">${live ? '<span class="dot"></span>' : ""}${meta}</span>
+        <span>查看明细</span>
+      </div>
+    </div>`;
+}
+function presenceHomeCards(){
+  const key = todayKey();
+  if(RAW[key] && RAW[key].offline) return `<div class="empty" style="grid-item:1/-1">设备当日离线，暂无统计数据</div>`;
+  const cov = currentMinute();
+  const rt = rtAt(key, "全区域", cov);
+  const peak = rtMax({key, s:0, e:cov+1}, "全区域");
+  const visits = dayTotalVisits(key, "全区域");
+  const dist = daySlotsSum(key, "distance");
+  let pv = 0, pm = 0;
+  REGIONS.forEach(r => { pv += dayTotalVisits(key, r); pm += dayTotalPersonMin(key, r); });
+  return `
+    ${cardHTML(1, "实时人数", METRICS.realtime.desc, fmtRT(rt), "人", "全区域 · 截至 " + fmtMin(cov), "当日最高 " + fmtRT(peak) + " 人（各区域合计）", true, "#/realtime")}
+    ${cardHTML(2, "访问人次", METRICS.visits.desc, fmtNum(visits), "人次", "今日 · 全区域", "最近半小时 +" + (lastSlotVal(key, "visits", "全区域") || 0) + " 人次", false, "#/visits")}
+    ${cardHTML(3, "平均驻留时长", METRICS.dwell.desc, pv ? (pm / pv).toFixed(1) : "—", "分钟", "今日 · 全区域", "今日累计驻留 " + pm + " 人·分钟", false, "#/dwell")}
+    ${cardHTML(4, "行走距离", METRICS.distance.desc, fmtNum(dist), "米", "今日 · 全区域累计", "最近半小时 +" + (lastSlotVal(key, "distance") || 0) + " 米 · 精度 1 米", false, "#/distance")}`;
+}
+function entranceHomeCards(){
+  const key = todayKey();
+  if(zoneMissing()) return `<div class="empty" style="grid-column:1/-1">未配置进出口，所有指标显示 “—”，请先前往区域配置划定进出口</div>`;
+  if(RAW[key] && RAW[key].offline) return `<div class="empty">设备当日离线，暂无统计数据</div>`;
+  const cov = currentMinute();
+  const raw = occRawAt(key, cov) || 0;
+  const occ = occAt(key, cov) || 0;
+  const enter = daySlotsSum(key, "enter");
+  const exit = daySlotsSum(key, "exit");
+  const peak = occMaxIn({key, s:DEVICE.window.start, e:Math.min(DEVICE.window.end + 1, cov + 1)});
+  const wtxt = DEVICE.window.on ? (fmtMin(DEVICE.window.start) + " – " + fmtMin(DEVICE.window.end)) : "已关闭 · 持续累计";
+  return `
+    ${cardHTML(1, "空间驻留人数", "实时驻留人数，即进出口区域内实际在场人员数量，由进出人次计算得到，支持手动校准偏移", String(occ), "人", "此刻 " + fmtMin(cov) + " · 进出人次法", "原始 " + raw + " 人 · 校准偏差 " + (DEVICE.calib ? ((DEVICE.calib.offset > 0 ? "+" : "") + DEVICE.calib.offset) : "0"), true, "#/entrance", true)}
+    ${cardHTML(2, "累计进入人次", "今日截止到当前时间的最新累计进入人次，累计进入人次 = Σ 进入人次增量", String(enter), "人次", "统计周期 " + wtxt, "最近半小时 +" + (lastSlotVal(key, "enter") || 0) + " 人次", false, "#/entrance")}
+    ${cardHTML(3, "累计离开人次", "今日截止到当前时间的最新累计离开人次，累计离开人次 = Σ 离开人次增量", String(exit), "人次", "统计周期 " + wtxt, "最近半小时 +" + (lastSlotVal(key, "exit") || 0) + " 人次", false, "#/entrance")}`;
+}
+/* 最近一个已完成半小时的上报值（各指标只引用自身口径） */
+function lastSlotVal(dateKey, metric, region){
+  const d = RAW[dateKey]; if(!d || d.offline) return null;
+  const seq = incSeries(dateKey, metric, region);
+  const i = Math.max(0, Math.min(SLOTS - 1, Math.floor((d.statCov - 1) / 30)));
+  return seq[i];
+}
+/* 分钟级上报序列（0 表示该分钟无上报） */
+function statCovOf(dateKey){ const d = RAW[dateKey]; return d && !d.offline ? d.statCov : 0; }
+function daySlotsSum(dateKey, metric, region){
+  const s = incSeries(dateKey, metric, region), lim = statCovOf(dateKey);
+  let t = 0; for(let i = 0; i < SLOTS && i * 30 < lim; i++) t += s[i];
+  return t;
+}
+function dayTotalVisits(dateKey, region){ return daySlotsSum(dateKey, "visits", region); }
+function dayTotalPersonMin(dateKey, region){
+  return Math.round(rtPersonMin(dateKey, region || "全区域", 0, statCovOf(dateKey)));
+}
+
+/* ---------- 侧边导航 ---------- */
 function sideNavHTML(active){
+  const list = metricsInScope();
   return `
     <aside class="side-nav">
-      <div class="nav-title">数据统计</div>
-      ${Object.entries(METRICS).map(([k,cfg],i) => `
-        <a href="#/${k}" class="${k===active?"on":""}">
-          <span class="nav-idx">0${i+1}</span>
-          <span>${cfg.name}</span>
-          <span class="nav-unit">${cfg.unit}</span>
-        </a>`).join("")}
+      <a class="nav-home" href="#/">← 返回看板</a>
+      <div class="nav-title">${DEVICE_NAME} · ${DEVICE.mode === "entrance" ? "进出口人流统计" : "存在监测"}</div>
+      ${list.map((k,i) => {
+        const cfg = METRICS[k];
+        return `<a href="#/${k}" class="${k===active?"on":""}">
+          <span class="nav-idx">0${i+1}</span><span>${cfg.name}</span><span class="nav-unit">${cfg.unit}</span></a>`;
+      }).join("")}
     </aside>`;
 }
 
+/* ---------- 详情页 ---------- */
 function renderDetail(m){
-  const cfg = METRICS[m];
-  crumb.innerHTML = `<a href="#/">数据统计</a><span class="sep">/</span><span>${cfg.name}</span>`;
+  renderHeader();
+  guardZone();
+  const cfg = METRICS[m], st = getState(m);
+  crumb.innerHTML = `<a href="#/">${DEVICE_NAME}</a><span class="sep">/</span><a href="#/">数据统计</a><span class="sep">/</span><span>${cfg.name}</span>`;
   app.innerHTML = `<div class="detail-layout">${sideNavHTML(m)}<div class="detail-main" id="detailMain"></div></div>`;
+  if(m === "entrance") return renderEntrance();
   if(m === "realtime") return renderRealtime();
   if(m === "dwell") return renderDwell();
-  renderGeneric(m);
+  renderReportMetric(m);
 }
-
-/* 通用筛选条（日期 + 半小时粒度时间段 + 区域） */
-function filterBarHTML(cfg, st){
-  const fromOpts = Array.from({length:SLOTS},(_,s)=>
-    `<option value="${s}" ${s===st.from?"selected":""}>${fmtSlot(s)}</option>`).join("");
-  const toOpts = Array.from({length:SLOTS},(_,i)=>{ const s = i + 1;
-    return `<option value="${s}" ${s===st.to?"selected":""}>${s>=SLOTS?"24:00":fmtSlot(s)}</option>`; }).join("");
+/* 时间维度：按时（当天小时级）→ 按日 / 按周 / 按月 / 自定义（天级） */
+const TIME_TYPES = [["hourly","按时"],["day","按日"],["week","按周"],["month","按月"],["custom","自定义"]];
+const TYPE_GRAIN = { hourly:"小时级", day:"天级", week:"天级", month:"天级", custom:"半小时级" };
+function grainLabel(st, cfg){ return st.type === "hourly" && cfg.entranceWindow ? "半小时级" : TYPE_GRAIN[st.type]; }
+function filterBarHTML(m, st){
+  const cfg = METRICS[m];
+  const min = availableMin(), max = todayKey();
+  const typeCtl = `
+    <div class="filter-group">
+      <span class="filter-label">按时间筛选</span>
+      <select id="fType" class="type-sel">${TIME_TYPES.map(([v,t]) =>
+        `<option value="${v}" ${st.type===v?"selected":""}>${t}</option>`).join("")}</select>
+    </div>`;
+  let dateCtl = "";
+  if(st.type === "hourly"){
+    dateCtl = `
+      <div class="filter-group">
+        <span class="filter-label">日期（无数据日期不可选）</span>
+        <input type="date" id="fDate" value="${st.date}" min="${min}" max="${max}">
+      </div>`;
+  }else if(st.type === "custom"){
+    const c = customOf(st), opts = v => halfHours().map(h => `<option ${h===v?"selected":""}>${h}</option>`).join("");
+    dateCtl = `
+      <div class="filter-group">
+        <span class="filter-label">自定义统计区间（半小时颗粒，最大 30 天）</span>
+        <div class="time-range">
+          <input type="date" id="fFrom" value="${c.fromDate}" min="${min}" max="${max}">
+          <select id="fFromT">${opts(c.fromTime)}</select>
+          <span style="color:var(--ink-3)">至</span>
+          <input type="date" id="fTo" value="${c.toDate}" min="${min}" max="${max}">
+          <select id="fToT">${opts(c.toTime)}</select>
+        </div>
+      </div>`;
+  }else{
+    dateCtl = "";        // 按日 / 按周 / 按月：区间固定（最近 30 天 / 本周 / 本月），不开放次级时间筛选
+  }
+  const grainCtl = `
+    <div class="filter-group">
+      <span class="filter-label">统计区间</span>
+      <span class="range-chip">${rangeSummary(st)}<em>${grainLabel(st, cfg)}</em></span>
+    </div>`;
   const regionSeg = cfg.hasRegion ? `
     <div class="filter-group">
-      <span class="filter-label">区域</span>
+      <span class="filter-label">按区域筛选</span>
       <div class="seg" id="regionSeg">
-        <button data-r="全区域" class="${st.region==="全区域"?"on":""}">全区域</button>
+        <button data-r="全区域" class="${st.region==="全区域"?"on":""}">全部区域</button>
         ${REGIONS.map(r=>`<button data-r="${r}" class="${st.region===r?"on":""}">${r}</button>`).join("")}
       </div>
     </div>` : "";
-  return `
-    <div class="filter-group">
-      <span class="filter-label">日期</span>
-      <input type="date" id="fDate" value="${st.date}">
-    </div>
-    <div class="filter-group">
-      <span class="filter-label">时间段（半小时粒度）</span>
-      <div class="time-range">
-        <select id="fFrom">${fromOpts}</select>
-        <span style="color:var(--ink-3)">至</span>
-        <select id="fTo">${toOpts}</select>
-      </div>
-    </div>
-    ${regionSeg}
-    <button class="export-btn" id="exportBtn">导出 Excel</button>`;
+  return typeCtl + dateCtl + grainCtl + regionSeg + `
+    <div class="export-group">
+      <button class="btn ghost" id="exportCsv">导出 CSV</button>
+      <button class="btn" id="exportBtn">导出 Excel</button>
+    </div>`;
 }
+function rangeSummary(st){
+  if(st.type === "hourly"){
+    const d = RAW[st.date];
+    const to = d && !d.offline ? fmtHM((d.statCov / 60) | 0, d.statCov % 60) + ":00" : "23:59:59";
+    return st.date + " 00:00 – " + to;
+  }
+  if(st.type === "custom") return customSpanLabel(st);
+  return st.range.from + " – " + st.range.to;
+}
+function fmtSecOf(t){ return fmtHM((t/60)|0, t%60) + ":" + String(new Date().getSeconds()).padStart(2,"0"); }
 function bindFilterEvents(m, st, redraw){
-  document.getElementById("fDate").onchange = e => { st.date = e.target.value; redraw(); };
-  const fFrom = document.getElementById("fFrom"), fTo = document.getElementById("fTo");
-  fFrom.onchange = e => { st.from = +e.target.value; if(st.to <= st.from){ st.to = Math.min(st.from + 1, SLOTS); fTo.value = st.to; } redraw(); };
-  fTo.onchange = e => { st.to = +e.target.value; if(st.to <= st.from){ st.from = Math.max(st.to - 1, 0); fFrom.value = st.from; } redraw(); };
+  const fType = document.getElementById("fType");
+  if(fType) fType.onchange = e => { applyRangePreset(st, e.target.value); renderDetail(m); };
+
+  const fd = document.getElementById("fDate");
+  if(fd) fd.onchange = e => {
+    if(!RAW[e.target.value]){ alert("所选日期无数据"); e.target.value = st.date; return; }
+    st.date = e.target.value; redraw();
+  };
+  const ff = document.getElementById("fFrom"), ft = document.getElementById("fTo");
+  if(ff && ft){
+    const fT = document.getElementById("fFromT"), tT = document.getElementById("fToT");
+    const onCustom = () => {
+      const c = customOf(st);
+      let a = ff.value, b = ft.value;
+      if(!a || !b) return;
+      if(parseDate(a) > parseDate(b)){ const t = a; a = b; b = t; }
+      if(Math.round((parseDate(b) - parseDate(a)) / 86400000) + 1 > 30){ alert("自定义时间段最大支持 30 天"); return; }
+      c.fromDate = a; c.toDate = b; c.fromTime = fT.value; c.toTime = tT.value;
+      if(timeMin(c.toTime) <= timeMin(c.fromTime) && c.fromDate === c.toDate){
+        alert("结束时刻需晚于起始时刻"); c.toTime = halfHours()[halfHours().length - 1]; tT.value = c.toTime;
+      }
+      syncCustomRange(st); redraw();
+    };
+    [ff, ft, fT, tT].forEach(el => { if(el) el.onchange = onCustom; });
+  }
+
   const seg = document.getElementById("regionSeg");
   if(seg) seg.addEventListener("click", e => {
     const b = e.target.closest("button"); if(!b) return;
@@ -443,485 +1372,1299 @@ function bindFilterEvents(m, st, redraw){
     redraw();
   });
   document.getElementById("exportBtn").onclick = () => exportExcel(m);
+  document.getElementById("exportCsv").onclick = () => exportCSV(m);
 }
-function detailHead(cfg, subExtra){
+function detailHead(cfg, extra){
   return `
+    <div class="back-row"><a class="back-btn" href="#/">← 返回 ${DEVICE_NAME} 看板</a></div>
     <div class="detail-head">
       <div>
         <div class="page-title">${cfg.name}</div>
-        <div class="page-sub" style="margin-bottom:0">${cfg.desc}${subExtra || ""}</div>
+        <div class="page-sub">指标说明：${cfg.desc}${extra || ""}</div>
       </div>
     </div>`;
 }
-
-/* ---------- 实时人数详情：小时最高 / 历史数据 双 Tab ---------- */
-function renderRealtime(){
-  const cfg = METRICS.realtime, st = getState("realtime");
-  const main = document.getElementById("detailMain");
-  main.innerHTML = detailHead(cfg) +
-    `<div class="filters">${filterBarHTML({hasRegion:true}, st)}</div>
-     <div id="rtWrap"></div>
-     <div class="note">实时人数为实时变化上报（非增量）：每次上报的值为当下实时人数准确值。「历史数据」列出每次上报的实时人数；「小时最高实时人数」为每个小时区间内实时人数的最大值。侦测能力上限 10 人，任何数值超过 10 一律显示 10+（含全区域合计与时段最高）。当天数据截至当前时刻。</div>`;
-  bindFilterEvents("realtime", st, drawRealtime);
-  drawRealtime();
+function offlineBanner(){
+  if(!(CUR.offlineRecent && DEVICE.mode === "entrance" && !DEVICE.prompted && !DEVICE.calib)) return "";
+  return `<div class="banner"><span class="txt">${COPY.offlineCalib}</span>
+    <button class="btn" id="calibYes">是</button><button class="btn ghost" id="calibNo">忽略</button></div>`;
 }
 
-function drawRealtime(){
-  const st = getState("realtime");
-  const wrap = document.getElementById("rtWrap");
-  if(!RAW[st.date]){ wrap.innerHTML = `<div class="empty">所选日期暂无数据</div>`; return; }
-
-  const regions = st.region === "全区域" ? REGIONS : [st.region];
-  const fromMin = st.from * 30, toMin = Math.min(st.to * 30, 24 * 60);
-  const lastMin = lastDataMinute(st.date);
-
-  /* 历史数据：每次上报的实时人数准确值 */
-  let histRows = [];
-  regions.forEach(rg => {
-    let count = 0;
-    RAW[st.date].realtime[rg].forEach(e => {
-      count = Math.max(0, count + e.delta);
-      const t = e.h * 60 + e.min;
-      if(t >= fromMin && t < toMin)
-        histRows.push({ t: fmtHM(e.h, e.min), rg, value: count });
-    });
-  });
-  histRows.sort((a,b) => a.t.localeCompare(b.t));
-
-  /* 小时最高：与所选半小时区间重叠的小时，按重叠分钟取最高值 */
-  let hourRows = [];
-  regions.forEach(rg => {
-    for(let h = 0; h < HOURS; h++){
-      const sMin = Math.max(h * 60, fromMin), eMin = Math.min(h * 60 + 60, toMin);
-      if(sMin >= eMin) continue;
-      hourRows.push({ label: `${fmtHM((sMin/60)|0, sMin%60)} – ${fmtHM(((eMin-1)/60)|0, (eMin-1)%60)}`, rg,
-        max: (eMin - 1) <= lastMin ? rtRangeMax(st.date, rg, sMin, eMin) : null });
-    }
-  });
-
-  /* 汇总（实时人数任何展示均封顶 10+） */
-  const cur = rtCurrent(st.date, st.region);
-  const todayPeak = rtRangeMax(st.date, st.region, 0, lastMin + 1);
-  const rangePeak = rtRangeMax(st.date, st.region, fromMin, Math.min(toMin, lastMin + 1));
-  const now = new Date();
-  const summaryHtml = `
-    <div class="sum-item"><div class="k">所选时段（${st.date}）</div><div class="v" style="font-size:16px">${spanLabel(st.from, st.to)}</div></div>
-    <div class="sum-item"><div class="k">当前实时人数（${st.date === todayKey() ? fmtHM(now.getHours(), now.getMinutes()) : "末日时刻"}）</div><div class="v">${fmtRT(cur)}<small>人</small></div></div>
-    <div class="sum-item"><div class="k">当日最高实时人数</div><div class="v">${fmtRT(todayPeak)}<small>人</small></div></div>
-    <div class="sum-item"><div class="k">所选时段最高</div><div class="v">${fmtRT(rangePeak)}<small>人</small></div></div>
-    <div class="sum-item"><div class="k">区域</div><div class="v" style="font-size:16px">${st.region}</div></div>`;
-
-  /* Tab：小时最高在前（默认），历史数据在后 */
-  const isHour = st.tab !== "hist";
-  const tabsHtml = `
-    <div class="tabs" id="rtTabs">
-      <button data-tab="hour" class="${isHour ? "on" : ""}">小时最高实时人数</button>
-      <button data-tab="hist" class="${!isHour ? "on" : ""}">历史数据<span class="cnt">${histRows.length} 条上报</span></button>
-    </div>`;
-
-  let tableHtml;
-  if(isHour){
-    const hourBody = hourRows.map(r => `<tr>
-        <td>${r.label}</td><td>${r.rg}</td>
-        <td><strong>${r.max == null ? "—" : fmtRT(r.max)}</strong></td></tr>`).join("");
-    tableHtml = `<table><thead><tr><th>时间段</th><th>区域</th><th>小时最高实时人数（人）</th></tr></thead>
-      <tbody>${hourBody}</tbody></table>`;
-  }else{
-    const histBody = histRows.length
-      ? histRows.map(r => `<tr>
-          <td>${r.t}</td><td>${r.rg}</td>
-          <td><strong>${fmtRT(r.value)}</strong></td></tr>`).join("")
-      : `<tr><td colspan="3" style="text-align:center;color:var(--ink-3)">所选时段内无上报记录</td></tr>`;
-    tableHtml = `<table><thead><tr><th>时间</th><th>区域</th><th>实时人数（人）</th></tr></thead>
-      <tbody>${histBody}</tbody></table>`;
-  }
-
-  wrap.innerHTML = `<div class="summary">${summaryHtml}</div>${tabsHtml}${tableHtml}`;
-
-  document.getElementById("rtTabs").addEventListener("click", e => {
-    const b = e.target.closest("button"); if(!b) return;
-    st.tab = b.dataset.tab;
-    drawRealtime();
+/* ---------- 通用报表型指标（访问人次 / 平均驻留时长 / 行走距离） ---------- */
+function renderReportMetric(m){
+  const cfg = METRICS[m], st = getState(m);
+  document.getElementById("detailMain").innerHTML = detailHead(cfg) +
+    `<div id="liveBar"></div><div class="filters">${filterBarHTML(m, st)}</div><div id="reportWrap"></div>`;
+  bindFilterEvents(m, st, () => drawReport(m));
+  drawLive(m);
+  drawReport(m);
+}
+function drawReport(m){
+  const st = getState(m);
+  const wrap = document.getElementById("reportWrap");
+  if(zoneMissing()){ wrap.innerHTML = zoneEmptyPanel(); return; }
+  const rep = m === "entrance" ? buildEntranceReport(st) : buildReport(m, st);
+  if(!rep){ wrap.innerHTML = `<div class="empty">设备离线或所选时间段无数据，数据显示 “-”</div>`; return; }
+  /* 进出口：秒级进出上报日志在前（实际值），半小时统计在后（统计值） */
+  const ent = m === "entrance" && st.type === "hourly" ? entMinuteSeries(st) : null;
+  const statTitle = m === "visits" ? (dayMode2(st) ? "访问人次半小时统计" : "访问人次每日统计")
+    : m === "distance" ? (dayMode2(st) ? "行走距离半小时统计" : "行走距离每日统计")
+    : m === "dwell" ? (dayMode2(st) ? "平均驻留时长半小时统计" : "平均驻留时长每日统计")
+    : m === "entrance" ? (dayMode2(st) ? "进出口半小时统计" : "进出口每日统计") : "";
+  wrap.innerHTML = `
+    <div class="hist-label">${histLabel(st, m)}</div>
+    ${summaryHTML(rep.summary)}
+    ${ent ? `
+    <div class="section-title">历史数据</div>
+    <div class="hist-item">
+      <div class="panel-title">分时进出与驻留<span class="tag-a">实际上报值</span>
+        <span style="font-size:12px;color:var(--ink-3);font-weight:400">毫秒级变化上报 · 共 ${ent.rows.length} 条记录 · 横轴按分钟取点，悬浮查看该条日志的精确时间与数值</span>
+        <span class="export-mini">
+          <button class="btn ghost sm" id="expEntLogCsv">导出 CSV</button>
+          <button class="btn ghost sm" id="expEntLogXls">导出 Excel</button>
+        </span>
+      </div>
+      <div id="entChartLive"></div>
+      <div class="tbl-wrap" style="margin-top:14px"><table>
+        <thead><tr><th>时间</th><th>方向</th><th>变化人次</th><th>空间驻留人数（人）</th></tr></thead>
+        <tbody>${ent.rows.length ? ent.rows.map(r => `<tr><td>${r.t}</td><td>${r.dir}</td><td class="delta">${r.d}</td><td><strong>${r.occ}</strong></td></tr>`).join("")
+          : `<tr><td colspan="4" style="text-align:center;color:var(--ink-3)">所选时间段内无上报记录</td></tr>`}</tbody></table></div>
+      <div class="note">每次进出变化即时上报（一秒内可能多条），空间驻留人数为该时刻的实际计算值 =（累计进入 − 累计离开）+ 校准偏差。</div>
+    </div>` : ""}
+    ${chartPanel(m, st, rep)}
+    ${statTitle ? `<div class="panel-title" style="margin:4px 0 10px">${statTitle}<span class="tag-b">统计值</span></div>` : ""}
+    <div class="tbl-wrap"><table><thead><tr>${rep.cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead>
+      <tbody>${rep.rows.length ? rep.rows.map(r => `<tr>${r.cells.map(c => `<td class="${c.cls||""}">${c.v}</td>`).join("")}</tr>`).join("")
+        : `<tr><td colspan="${rep.cols.length}" style="text-align:center;color:var(--ink-3)">所选时间段内无数据</td></tr>`}</tbody></table></div>
+    ${rep.notes.map(n => `<div class="note">${n}</div>`).join("")}`;
+  bindChart(m, st, rep);
+  if(ent) renderChart(document.getElementById("entChartLive"), { labels: ent.labels, ticks: ent.ticks, series:[
+    { name:"增量进入人次", color: COLOR.blue, type:"bar", unit:" 人次", data: ent.inV },
+    { name:"增量离开人次", color: COLOR.green, type:"bar", unit:" 人次", data: ent.outV },
+    { name:"空间驻留人数", color: COLOR.violet, type:"bar", unit:" 人", axis:"right", data: ent.occV },
+  ] });
+  [["expEntLogCsv","csv"],["expEntLogXls","xlsx"]].forEach(([id,ext]) => {
+    const btn = document.getElementById(id); if(btn) btn.onclick = () => exportEntLog(ext);
   });
 }
-
-/* ---------- 平均驻留时长详情：分区统计 / 历史对比 ---------- */
+/* ---------- 平均驻留时长：分区统计（当天自 0 点累计 / 历史全天固定值）+ 历史对比 ----------
+ * 本功能不提供时间段筛选（通用按时间筛选的例外指标）：
+ * 分区统计仅提供日期选择——当天为自 0:00 起每半小时累计至当前的实时统计，历史日期为全天固定值；
+ * 历史对比提供近 7 天 / 近 30 天逐日对比（折线图 + 日期×区域矩阵表）。 */
 function renderDwell(){
   const cfg = METRICS.dwell, st = getState("dwell");
-  const main = document.getElementById("detailMain");
-  main.innerHTML = detailHead(cfg) +
-    `<div id="dwWrap"></div>
-     <div class="note">平均驻留时长 = Σ(实时人数 × 该实时人数持续时长) ÷ 访问人次。「分区统计」默认展示当天累计至当前时刻的数据，可选择日期：当天显示当前累计数据，历史日期显示各区域全天固定值总览；分时累计明细默认折叠，需要详细数据时点击展开。「历史对比」可选择区域查看该区域逐日平均驻留时长变化。</div>`;
-  drawDwell();
-}
-
-function dwellRegionSeg(st){
-  return `<div class="filter-group">
-    <span class="filter-label">区域</span>
-    <div class="seg" id="regionSeg">
-      <button data-r="全区域" class="${st.region==="全区域"?"on":""}">全区域</button>
-      ${REGIONS.map(r=>`<button data-r="${r}" class="${st.region===r?"on":""}">${r}</button>`).join("")}
-    </div>
-  </div>`;
-}
-
-/* 全天总量：Σ(实时人数 × 持续时长) ÷ 访问人次（历史日期即全天固定值） */
-function dwellDayTotal(dateKey, region){
-  const tl = rtTimelines(dateKey)[region];
-  const vArr = series(dateKey, "visits", region);
-  const lastMin = lastDataMinute(dateKey);
-  let personMin = 0;
-  for(let m = 0; m <= lastMin; m++) personMin += tl[m];
-  const visits = sumArr(vArr);
-  return { visits, personMin, avg: visits ? +(personMin / visits).toFixed(1) : 0 };
-}
-
-/* 分时累计：从 0 点起逐半小时累计（当天截至当前时刻，历史日期为完整天） */
-function dwellCumRows(dateKey, region){
-  const tl = rtTimelines(dateKey)[region];
-  const vArr = series(dateKey, "visits", region);
-  const lastMin = lastDataMinute(dateKey);        // 数据覆盖到的最后一分钟（含）
-  const nowSlot = Math.floor(lastMin / 30);       // 当前所在的半小时槽
-  const rows = [];
-  let cumV = 0, cumMin = 0;
-  for(let s = 0; s <= nowSlot; s++){
-    cumV += vArr[s];
-    const endMin = Math.min(s * 30 + 30, lastMin + 1);
-    for(let m = s * 30; m < endMin; m++) cumMin += tl[m];
-    const partial = endMin < s * 30 + 30;
-    rows.push({ label: partial ? `${fmtSlot(s)} – ${fmtHM(((endMin-1)/60)|0, (endMin-1)%60)}` : slotLabel(s),
-      visits: cumV, personMin: cumMin, avg: cumV ? +(cumMin / cumV).toFixed(1) : 0 });
-  }
-  return rows;
-}
-
-/* 分时累计明细（折叠展示） */
-function dwellDetailHTML(rows){
-  return `<details class="dwell-detail">
-    <summary><span>分时累计明细（每半小时）</span><span class="hint">共 ${rows.length} 行，点击展开 ＋</span></summary>
-    <table><thead><tr><th>时间段</th><th>时段访问人次（人次）</th><th>时段累计驻留（人·分钟）</th><th>平均驻留时长（分钟）</th></tr></thead>
-    <tbody>${rows.map(r => `<tr>
-      <td>${r.label}</td><td>${r.visits}</td><td>${r.personMin}</td>
-      <td><strong>${(+r.avg).toFixed(1)}</strong></td></tr>`).join("")}</tbody></table>
-  </details>`;
-}
-
-/* 历史：各日期全天固定值矩阵 */
-function dwellHistMatrix(){
-  return Object.keys(RAW).sort().map(d => {
-    const row = { date: d };
-    REGIONS.forEach(r => row[r] = RAW[d].dwell[r].avg);
-    const allV = sumArr(REGIONS.map(r => RAW[d].dwell[r].visits));
-    const allMin = sumArr(REGIONS.map(r => RAW[d].dwell[r].personMin));
-    row["全区域"] = allV ? +(allMin / allV).toFixed(1) : 0;
-    return row;
-  });
-}
-
-/* 单区域逐日趋势折线图（纯 SVG，无第三方依赖） */
-function dwellChart(dates, values){
-  const W = 780, H = 230, PL = 46, PR = 20, PT = 20, PB = 32;
-  const top = Math.ceil(Math.max(...values, 1) * 1.25);
-  const x = i => PL + (W - PL - PR) * (dates.length === 1 ? 0.5 : i / (dates.length - 1));
-  const y = v => PT + (H - PT - PB) * (1 - v / top);
-  let grid = "";
-  for(let g = 0; g <= 4; g++){
-    const gv = top * g / 4, gy = y(gv);
-    grid += `<line x1="${PL}" y1="${gy}" x2="${W-PR}" y2="${gy}" stroke="#f0f1f5"/>
-             <text x="${PL-8}" y="${gy+4}" text-anchor="end" font-size="10" fill="#9a9eac">${gv.toFixed(1)}</text>`;
-  }
-  const pts = values.map((v,i)=>`${x(i)},${y(v)}`).join(" ");
-  const dots = values.map((v,i)=>`
-    <circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="#12141f"/>
-    <text x="${x(i)}" y="${y(v)-9}" text-anchor="middle" font-size="11" font-weight="600" fill="#12141f">${v.toFixed(1)}</text>
-    <text x="${x(i)}" y="${H-10}" text-anchor="middle" font-size="10" fill="#9a9eac">${dates[i].slice(5)}</text>`).join("");
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;border:1px solid var(--line);background:#fff">
-    ${grid}
-    <polyline points="${pts}" fill="none" stroke="#12141f" stroke-width="2"/>
-    ${dots}
-  </svg>`;
-}
-
-function drawDwell(){
-  const cfg = METRICS.dwell, st = getState("dwell");
-  const wrap = document.getElementById("dwWrap");
-  const isZone = st.tab !== "hist";   // 分区统计（默认）/ 历史对比
-  const now = new Date();
-  const nowStr = fmtHM(now.getHours(), now.getMinutes());
-
-  const tabsHtml = `
-    <div class="tabs" id="dwTabs">
-      <button data-tab="zone" class="${isZone ? "on" : ""}">分区统计</button>
-      <button data-tab="hist" class="${!isZone ? "on" : ""}">历史对比</button>
-    </div>`;
-
-  let filtersHtml, summaryHtml, bodyHtml;
-
-  if(isZone){
-    /* 分区统计：可选日期，不支持时间段 */
-    const dateKey = st.date;
-    const minDate = Object.keys(RAW).sort()[0];
-    const isToday = dateKey === todayKey();
-    filtersHtml = `<div class="filters">
-      <div class="filter-group">
-        <span class="filter-label">日期</span>
-        <input type="date" id="dwDate" value="${st.date}" min="${minDate}" max="${todayKey()}">
+  if(!st.dwTab) st.dwTab = "zone";
+  if(!st.dwDate) st.dwDate = todayKey();
+  if(!st.dwRange) st.dwRange = 7;
+  const min = availableMin(), max = todayKey();
+  const tabCtl = `
+    <div class="filter-group">
+      <span class="filter-label">功能板块</span>
+      <div class="tabs" id="dwTabs" style="margin-bottom:0">
+        <button data-t="zone" class="${st.dwTab === "zone" ? "on" : ""}">分区统计</button>
+        <button data-t="hist" class="${st.dwTab === "hist" ? "on" : ""}">历史对比</button>
       </div>
-      ${dwellRegionSeg(st)}
-      <button class="export-btn" id="exportBtn">导出 Excel</button>
     </div>`;
-
-    if(!RAW[dateKey]){
-      wrap.innerHTML = `${tabsHtml}${filtersHtml}<div class="empty">所选日期暂无数据（演示数据保留最近 30 天）</div>`;
-      bindDwellCommon(st);
-      const d = document.getElementById("dwDate");
-      if(d) d.onchange = e => { st.date = e.target.value; drawDwell(); };
-      return;
-    }
-
-    const detailRows = dwellCumRows(dateKey, st.region);
-    const last = detailRows[detailRows.length - 1] || { visits: 0, personMin: 0, avg: 0 };
-
-    if(isToday){
-      /* 当天：只显示当前累计数据 + 折叠的分时明细 */
-      summaryHtml = `
-        <div class="sum-item"><div class="k">统计日期</div><div class="v" style="font-size:16px">${todayKey()}</div></div>
-        <div class="sum-item"><div class="k">累计更新至</div><div class="v" style="font-size:16px">${nowStr}（每半小时更新）</div></div>
-        <div class="sum-item"><div class="k">当前平均驻留时长（${st.region}）</div><div class="v">${(+last.avg).toFixed(1)}<small>分钟</small></div></div>`;
-      bodyHtml = dwellDetailHTML(detailRows);
-    }else{
-      /* 历史日期：各区域全天固定值总览 + 折叠的分时明细（随所选区域联动） */
-      const overview = [...REGIONS, "全区域"].map(rg => ({ rg, ...dwellDayTotal(dateKey, rg) }));
-      const sel = overview.find(r => r.rg === st.region) || overview[overview.length - 1];
-      summaryHtml = `
-        <div class="sum-item"><div class="k">所选日期</div><div class="v" style="font-size:16px">${dateKey}</div></div>
-        <div class="sum-item"><div class="k">数据口径</div><div class="v" style="font-size:16px">全天固定值</div></div>
-        <div class="sum-item"><div class="k">全天平均驻留时长（${st.region}）</div><div class="v">${(+sel.avg).toFixed(1)}<small>分钟</small></div></div>`;
-      bodyHtml = `
-        <table><thead><tr><th>区域</th><th>访问人次（人次）</th><th>累计驻留（人·分钟）</th><th>平均驻留时长（分钟）</th></tr></thead>
-        <tbody>${overview.map(r => `<tr style="${r.rg===st.region?"background:#f4f5f8;":""}">
-          <td>${r.rg}${r.rg===st.region ? " ●" : ""}</td><td>${r.visits}</td><td>${r.personMin}</td>
-          <td><strong>${(+r.avg).toFixed(1)}</strong></td></tr>`).join("")}</tbody></table>
-        ${dwellDetailHTML(detailRows)}`;
-    }
-  }else{
-    /* 历史对比：可选区域 + 日期范围（近7天/近30天），逐日变化图表 + 日期倒序矩阵表 */
-    const range = (st.range === 30) ? 30 : 7;
-    const datesAsc = Object.keys(RAW).sort().slice(-range);
-    const matrix = dwellHistMatrix()
-      .filter(r => datesAsc.indexOf(r.date) >= 0)
-      .sort((a,b) => b.date.localeCompare(a.date)); // 近 → 远
-    const regionCols = [...REGIONS, "全区域"];
-    const colIdx = regionCols.indexOf(st.region);
-    const chartValues = datesAsc.map(d => +(matrix.find(r => r.date === d)[st.region]));
-    const avgAll = chartValues.length ? sumArr(chartValues) / chartValues.length : 0;
-    const rangeSeg = `<div class="filter-group">
+  const dateCtl = st.dwTab === "zone" ? `
+    <div class="filter-group">
+      <span class="filter-label">日期（无数据日期不可选）</span>
+      <input type="date" id="dwDate" value="${st.dwDate}" min="${min}" max="${max}">
+    </div>` : `
+    <div class="filter-group">
       <span class="filter-label">日期范围</span>
-      <div class="seg" id="rangeSeg">
-        <button data-n="7" class="${range===7?"on":""}">近 7 天</button>
-        <button data-n="30" class="${range===30?"on":""}">近 30 天</button>
+      <div class="seg" id="dwRangeSeg">
+        <button data-n="7" class="${st.dwRange === 7 ? "on" : ""}">近 7 天</button>
+        <button data-n="30" class="${st.dwRange === 30 ? "on" : ""}">近 30 天</button>
       </div>
     </div>`;
-    filtersHtml = `<div class="filters">${rangeSeg}${dwellRegionSeg(st)}<button class="export-btn" id="exportBtn">导出 Excel</button></div>`;
-    summaryHtml = `
-      <div class="sum-item"><div class="k">所选区域</div><div class="v" style="font-size:16px">${st.region}</div></div>
-      <div class="sum-item"><div class="k">日期范围</div><div class="v" style="font-size:16px">${datesAsc[0]} ~ ${datesAsc[datesAsc.length-1]}</div></div>
-      <div class="sum-item"><div class="k">近 ${datesAsc.length} 天平均</div><div class="v">${avgAll.toFixed(1)}<small>分钟</small></div></div>`;
-    bodyHtml = dwellChart(datesAsc, chartValues) + `
-      <div style="margin:24px 0 12px;font-size:15px;font-weight:600">各日期 · 各区域平均驻留时长（分钟）<span style="font-weight:400;font-size:12px;color:var(--ink-3);margin-left:8px">按日期近 → 远排序</span></div>
-      <table><thead><tr><th>日期</th>${regionCols.map((c,i)=>`<th style="${i===colIdx?"color:var(--ink);text-decoration:underline;text-underline-offset:4px;":""}">${c}</th>`).join("")}</tr></thead>
-      <tbody>${matrix.map(r => `<tr>
-        <td>${r.date}${r.date === todayKey() ? "（今天，截至当前）" : ""}</td>
-        ${regionCols.map((c,i)=>`<td style="${i===colIdx?"font-weight:700;":""}">${(+r[c]).toFixed(1)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
-  }
-
-  wrap.innerHTML = `<div class="summary">${summaryHtml}</div>${tabsHtml}${filtersHtml}${bodyHtml}`;
-  bindDwellCommon(st);
-}
-
-function bindDwellCommon(st){
+  const regionSeg = `
+    <div class="filter-group">
+      <span class="filter-label">按区域筛选</span>
+      <div class="seg" id="regionSeg">
+        <button data-r="全区域" class="${st.region === "全区域" ? "on" : ""}">全部区域</button>
+        ${REGIONS.map(r => `<button data-r="${r}" class="${st.region === r ? "on" : ""}">${r}</button>`).join("")}
+      </div>
+    </div>`;
+  document.getElementById("detailMain").innerHTML = detailHead(cfg,
+      "本功能提供「分区统计」与「历史对比」两个板块，均不支持时间段筛选：分区统计支持选择日期（当天为自 0:00 起每半小时累计至当前的实时统计，历史日期为全天固定值）；历史对比支持近 7 天 / 近 30 天逐日对比。") +
+    `<div id="liveBar"></div>
+     <div class="filters">${tabCtl + dateCtl + regionSeg}
+       <div class="export-group">
+         <button class="btn ghost" id="exportCsv">导出 CSV</button>
+         <button class="btn" id="exportBtn">导出 Excel</button>
+       </div>
+     </div>
+     <div id="dwWrap"></div>`;
   document.getElementById("dwTabs").addEventListener("click", e => {
     const b = e.target.closest("button"); if(!b) return;
-    st.tab = b.dataset.tab;
-    drawDwell();
+    st.dwTab = b.dataset.t; renderDwell();
   });
-  const d = document.getElementById("dwDate");
-  if(d) d.onchange = e => { st.date = e.target.value; drawDwell(); };
-  const rs = document.getElementById("rangeSeg");
-  if(rs) rs.addEventListener("click", e => {
+  const dd = document.getElementById("dwDate");
+  if(dd) dd.onchange = e => {
+    if(!RAW[e.target.value]){ alert("所选日期无数据"); e.target.value = st.dwDate; return; }
+    st.dwDate = e.target.value; drawDwell();
+  };
+  const rg = document.getElementById("dwRangeSeg");
+  if(rg) rg.addEventListener("click", e => {
     const b = e.target.closest("button"); if(!b) return;
-    st.range = +b.dataset.n;
+    st.dwRange = Number(b.dataset.n);
+    rg.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
     drawDwell();
   });
   document.getElementById("regionSeg").addEventListener("click", e => {
     const b = e.target.closest("button"); if(!b) return;
     st.region = b.dataset.r;
+    document.getElementById("regionSeg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
     drawDwell();
   });
   document.getElementById("exportBtn").onclick = () => exportExcel("dwell");
+  document.getElementById("exportCsv").onclick = () => exportCSV("dwell");
+  drawLive("dwell");
+  drawDwell();
 }
-
-/* ---------- 通用增量详情（访问人次 / 今日行走距离，半小时粒度） ---------- */
-function renderGeneric(m){
-  const cfg = METRICS[m], st = getState(m);
-  const main = document.getElementById("detailMain");
-  main.innerHTML = detailHead(cfg, " · 按半小时粒度") +
-    `<div class="filters">${filterBarHTML(cfg, st)}</div>
-     <div id="tableWrap"></div>
-     <div class="note">设备按半小时粒度上报，表格中「时间段增量」为设备原始上报值，「时段内累计」为在所选时间段内对增量的累计。</div>`;
-  bindFilterEvents(m, st, () => drawTable(m));
-  drawTable(m);
-}
-
-function buildRows(m){
-  const cfg = METRICS[m], st = getState(m);
-  const regions = (cfg.hasRegion && st.region !== "全区域") ? [st.region]
-    : (cfg.hasRegion ? ["全区域"] : [null]);
-  const rows = [];
-  regions.forEach(rg => {
-    const s = series(st.date, m, rg || "全区域");
-    let cum = 0;
-    for(let sl = st.from; sl < st.to; sl++){
-      const inc = s[sl];
-      cum += inc;
-      rows.push({ label: slotLabel(sl), region: rg,
-        inc: +inc.toFixed(cfg.precision), cum: +cum.toFixed(cfg.precision) });
-    }
-  });
+/* 当天：自 0:00 起逐半小时累计（dwellInBucket 已按 statCov 截断未完成的半小时，天然向下取整） */
+function dwellCumRows(dateKey, region){
+  const day = RAW[dateKey];
+  if(!day || day.offline) return [];
+  const rows = []; let cv = 0, cm = 0;
+  for(let s = 0; s + 30 <= day.statCov; s += 30){
+    const d = dwellInBucket({ key: dateKey, s, e: s + 30 }, region);
+    if(!d) continue;
+    cv += d.visits; cm += d.personMin;
+    rows.push({ label: fmtMin(s) + " – " + fmtMin(s + 29), inc: d.visits, cumV: cv, cumM: cm,
+      avg: cv ? (cm / cv).toFixed(1) : null });
+  }
   return rows;
 }
-
-function drawTable(m){
-  const cfg = METRICS[m], st = getState(m);
-  const wrap = document.getElementById("tableWrap");
-  if(!RAW[st.date]){ wrap.innerHTML = `<div class="empty">所选日期暂无数据</div>`; return; }
-  const rows = buildRows(m);
-
-  const thead = `<tr>${cfg.cols.map(c=>`<th>${c}</th>`).join("")}</tr>`;
-  const body = rows.map(r => {
-    let tds = `<td>${r.label}</td>`;
-    if(cfg.hasRegion) tds += `<td>${r.region}</td>`;
-    tds += `<td class="delta">+${fmtNum(r.inc, cfg.precision)}</td><td><strong>${fmtNum(r.cum, cfg.precision)}</strong></td>`;
-    return `<tr>${tds}</tr>`;
-  }).join("");
-
-  const totInc = rows.reduce((s,r)=>s + r.inc, 0);
-  const lastCum = rows.length ? rows[rows.length-1].cum : 0;
-  let summaryHtml = `
-    <div class="sum-item"><div class="k">所选时段（${st.date}）</div><div class="v" style="font-size:16px">${spanLabel(st.from, st.to)}</div></div>
-    <div class="sum-item"><div class="k">时段增量合计</div><div class="v">+${fmtNum(totInc, cfg.precision)}<small>${cfg.unit}</small></div></div>
-    <div class="sum-item"><div class="k">时段末累计</div><div class="v">${fmtNum(lastCum, cfg.precision)}<small>${cfg.unit}</small></div></div>`;
-  if(cfg.hasRegion) summaryHtml += `<div class="sum-item"><div class="k">区域</div><div class="v" style="font-size:16px">${st.region}</div></div>`;
-
-  wrap.innerHTML = `<div class="summary">${summaryHtml}</div>
-    <table><thead>${thead}</thead><tbody>${body}</tbody></table>`;
+function dwellCumCols(){ return ["时间段", "时段访问人次（人次）", "时段累计驻留（人·分钟）", "平均驻留时长（分钟）"]; }
+function dwellCumTableHTML(rows){
+  return `<details class="dw-details">
+    <summary>分时累计明细<span class="tag-b" style="margin-left:2px">每半小时</span>
+      <span style="font-size:12px;color:var(--ink-3);font-weight:400">自 0:00 起逐半小时累计 · 共 ${rows.length} 行 · 点击展开</span></summary>
+    <div class="tbl-wrap"><table>
+      <thead><tr>${dwellCumCols().map(c => `<th>${c}</th>`).join("")}</tr></thead>
+      <tbody>${rows.length ? rows.map(r => `<tr>
+          <td>${r.label}</td><td>${r.inc}</td><td>${r.cumM}</td>
+          <td class="${r.avg == null ? "na" : ""}">${r.avg == null ? "—" : r.avg}</td></tr>`).join("")
+        : `<tr><td colspan="4" style="text-align:center;color:var(--ink-3)">当日暂无可统计数据</td></tr>`}</tbody></table></div>
+  </details>`;
+}
+/* 历史日期全天固定值：区域 1~8 + 全区域总览 */
+function dwellDayOverview(dateKey){
+  return REGIONS.concat(["全区域"]).map(rg => {
+    const v = dayTotalVisits(dateKey, rg), m = dayTotalPersonMin(dateKey, rg);
+    return { rg, v, m, avg: v ? (m / v).toFixed(1) : null };
+  });
+}
+function drawDwell(){
+  const st = getState("dwell");
+  const wrap = document.getElementById("dwWrap");
+  if(zoneMissing()){ wrap.innerHTML = zoneEmptyPanel(); return; }
+  if(st.dwTab === "hist") return drawDwellHist(st, wrap);
+  const key = st.dwDate, day = RAW[key], region = st.region;
+  if(!day || day.offline){ wrap.innerHTML = `<div class="empty">设备当日离线或所选日期无数据，数据显示 “-”</div>`; return; }
+  const isToday = key === todayKey();
+  const totV = dayTotalVisits(key, region), totM = dayTotalPersonMin(key, region);
+  const covTxt = fmtHM((day.statCov / 60) | 0, day.statCov % 60);
+  const kpi = isToday ? [
+      { k:"统计日期", v: key, txt:true },
+      { k:"累计更新至", v: covTxt, x:"自 0:00 起每半小时更新一次" },
+      { k:"当前平均驻留时长", v: totV ? (totM / totV).toFixed(1) : "—", u:"分钟",
+        x: region + " · 今日累计驻留 " + totM + " 人·分钟 · 访问 " + totV + " 人次" },
+    ] : [
+      { k:"统计日期", v: key, txt:true },
+      { k:"数据类型", v:"全天固定值", x:"当天 0:00 – 23:59 全天累计计算" },
+      { k:"全天平均驻留时长", v: totV ? (totM / totV).toFixed(1) : "—", u:"分钟",
+        x: region + " · 全天累计驻留 " + totM + " 人·分钟 · 访问 " + totV + " 人次" },
+    ];
+  const overview = isToday ? "" : `
+    <div class="panel-title">各区域全天总览<span class="tag-b">统计值</span>
+      <span style="font-size:12px;color:var(--ink-3);font-weight:400">切换上方区域筛选，下方分时累计明细与选中行联动</span></div>
+    <div class="tbl-wrap" style="margin-bottom:14px"><table>
+      <thead><tr><th>区域</th><th>访问人次（人次）</th><th>累计驻留（人·分钟）</th><th>平均驻留时长（分钟）</th></tr></thead>
+      <tbody>${dwellDayOverview(key).map(r => `<tr class="${r.rg === region ? "dw-on" : ""}">
+        <td>${r.rg === region ? "● " : ""}${r.rg}</td><td>${r.v}</td><td>${r.m}</td>
+        <td class="${r.avg == null ? "na" : ""}">${r.avg == null ? "—" : r.avg}</td></tr>`).join("")}</tbody></table></div>`;
+  wrap.innerHTML = `
+    ${summaryHTML(kpi)}
+    ${overview}
+    <div class="panel-title">分时累计（自 0:00 起每半小时）<span class="tag-a">统计值</span></div>
+    ${dwellCumTableHTML(dwellCumRows(key, region))}
+    <div class="note">${METRICS.dwell.formula}</div>
+    <div class="note">分时明细默认折叠，点击折叠条展开查看各时间段的时段访问人次、时段累计驻留与平均驻留时长；当天数据按已完成的每半小时滚动累计，未完成的当前半小时不计入。</div>
+    <div class="note">访问人次为 0 等异常时平均驻留时长显示 “-”；导出内容跟随当前板块与所选日期 / 区域。</div>`;
+}
+function drawDwellHist(st, wrap){
+  const region = st.region, n = st.dwRange, keys = [];
+  for(let i = n - 1; i >= 0; i--) keys.push(fmtDate(addDays(new Date(), -i)));   // 远 → 近
+  const labels = keys.map(fmtMD);
+  const vals = keys.map(k => {
+    const d = RAW[k]; if(!d || d.offline) return null;
+    const v = dayTotalVisits(k, region), m = dayTotalPersonMin(k, region);
+    return v ? +(m / v).toFixed(1) : null;
+  });
+  const valid = vals.filter(v => v != null);
+  const today = todayKey();
+  const colRgs = REGIONS.concat(["全区域"]);
+  const matrixRows = keys.slice().reverse().map(k => {   // 近 → 远
+    const d = RAW[k];
+    return { k, label: fmtMD(k) + (k === today ? "（截至当前）" : ""),
+      vals: colRgs.map(rg => {
+        if(!d || d.offline) return null;
+        const v = dayTotalVisits(k, rg), m = dayTotalPersonMin(k, rg);
+        return v ? (m / v).toFixed(1) : null;
+      }) };
+  });
+  wrap.innerHTML = `
+    ${summaryHTML([
+      { k:"对比区间", v: fmtCN(keys[0]) + " – " + fmtCN(keys[keys.length - 1]), txt:true },
+      { k:"有数据天数", v: String(valid.length), u:"天", x:"无数据 / 离线日期显示 “-”" },
+      { k:"区间日均", v: valid.length ? (sumArr(valid) / valid.length).toFixed(1) : "—", u:"分钟", x: region },
+    ])}
+    <div class="panel-title">各日期平均驻留时长变化<span class="tag-a">统计值</span>
+      <span style="font-size:12px;color:var(--ink-3);font-weight:400">${region} · 逐日平均驻留时长（分钟）</span></div>
+    <div id="dwHistChart"></div>
+    <div class="panel-title" style="margin-top:18px">各日期 · 各区域平均驻留时长（分钟）<span class="tag-b">统计值</span></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>日期</th>${colRgs.map(rg => `<th class="${rg === region ? "dw-col" : ""}">${rg}</th>`).join("")}</tr></thead>
+      <tbody>${matrixRows.map(r => `<tr><td>${r.label}</td>${r.vals.map((v, i) =>
+        `<td class="${colRgs[i] === region ? "dw-col " : ""}${v == null ? "na" : ""}">${v == null ? "—" : v}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+    <div class="note">${METRICS.dwell.formula}</div>
+    <div class="note">折线图按时间正序（远 → 近）展示所选区域逐日变化；表格按时间倒序（近 → 远）排列，所选区域列高亮，今天标注“截至当前”。</div>`;
+  renderChart(document.getElementById("dwHistChart"), { labels, ticks: labels, series:[
+    { name:"平均驻留时长", color: COLOR.amber, type:"line", data: vals, unit:" 分钟", dec:1 },
+  ] });
+}
+/* 进出口·分时进出与驻留：秒级上报事件（一秒内可能多条），驻留人数为该时刻实际值 */
+function entMinuteSeries(st){
+  const out = { labels:[], ticks:[], inV:[], outV:[], occV:[], rows:[] };
+  const spec = bucketSpec(st, "entrance");
+  if(!spec) return out;
+  const list = entEvList(st.date); if(!list) return out;
+  const s0 = (DEVICE.window.on ? DEVICE.window.start : 0) * 60;
+  const s1 = Math.min((DEVICE.window.on ? DEVICE.window.end + 1 : 24 * 60), statCovOf(st.date)) * 60;
+  list.forEach(e => {
+    if(e.t < s0 || e.t >= s1) return;
+    const occ = occAt(st.date, Math.floor(e.t / 60));
+    out.labels.push(fmtHMS(e.t));
+    out.ticks.push(fmtHM(Math.floor(e.t/3600), Math.floor(e.t/60)%60));
+    out.inV.push(e.dir === "in" ? e.d : 0);
+    out.outV.push(e.dir === "out" ? e.d : 0);
+    out.occV.push(occ);
+    out.rows.push({ t: fmtHMS(e.t), dir: e.dir === "in" ? "进入" : "离开",
+      d: "+" + e.d, occ: occ == null ? "—" : String(occ) });
+  });
+  return out;
+}
+function summaryHTML(items){
+  return `<div class="summary">${items.map(i => `
+    <div class="sum-item"><div class="k">${i.k}</div>
+      <div class="v ${i.txt ? "txt" : ""}">${i.v}${i.u ? `<small>${i.u}</small>` : ""}</div>
+      ${i.x ? `<div class="x">${i.x}</div>` : ""}</div>`).join("")}</div>`;
+}
+function notesBlock(list){ return list.map(n => `<div class="note">${n}</div>`).join(""); }
+function dayMode2(st){ return st.type === "hourly" || st.type === "custom"; }
+/* 设备处于进出口人流统计模式但未配置进出口 → 弹窗引导去区域配置，所有数据显示 “—” */
+function zoneMissing(){ return DEVICE.mode === "entrance" && !CUR.entryZone; }
+function zoneEmptyPanel(){
+  return `<div class="empty zone-empty">
+    <div class="ze-title">未配置进出口，暂无统计数据</div>
+    <div class="ze-sub">该设备已启用进出口人流统计模式，需先在区域配置中划定进出口；配置完成前所有指标显示 “—”。</div>
+    <a class="btn" href="#/zones" style="margin-top:14px">前往区域配置</a>
+  </div>`;
+}
+function guardZone(){
+  if(!zoneMissing() || DEVICE.zonePrompted) return;
+  DEVICE.zonePrompted = true;
+  const mask = document.createElement("div");
+  mask.className = "mask";
+  mask.innerHTML = `<div class="modal">
+    <h3>尚未配置进出口</h3>
+    <div class="body">该设备已启用进出口人流统计模式，但还没有划定进出口区域，统计数据无法计算（当前均显示 “—”）。请先前往区域配置划定进出口。</div>
+    <div class="foot"><button class="btn ghost" id="zLater">稍后再说</button><button class="btn" id="zGo">前往配置</button></div>
+  </div>`;
+  document.body.appendChild(mask);
+  mask.querySelector("#zGo").onclick = () => { mask.remove(); location.hash = "#/zones"; };
+  mask.querySelector("#zLater").onclick = () => mask.remove();
+}
+function exportEntLog(ext){
+  const st = getState("entrance");
+  const ent = entMinuteSeries(st);
+  if(!ent.rows.length){ alert("所选时间段内无上报记录"); return; }
+  const cols = ["时间","方向","变化人次","空间驻留人数（人）"];
+  const rows = ent.rows.map(r => [r.t, r.dir, r.d, r.occ]);
+  const sheets = [{ name:"进出口分时进出与驻留", cols, rows }];
+  if(ext === "csv") return writeCSV("entrance", sheets, "entlog");
+  if(typeof XLSX === "undefined"){ alert("当前环境无法加载 Excel 导出组件，请联网后重试，或使用「导出 CSV」"); return; }
+  const wb = XLSX.utils.book_new();
+  appendSheets(wb, sheets);
+  XLSX.writeFile(wb, fileName("entrance", "xlsx", "entlog"));
+}
+function cumFrom(arr){ let c = 0; return arr.map(v => { if(v == null) return null; c += v; return c; }); }
+/* 跨天清零：桶所属日期变化时累计重新起算 */
+function cumByKey(buckets, arr){
+  let c = 0, prev = null;
+  return arr.map((v, i) => {
+    if(buckets[i].key !== prev){ c = 0; prev = buckets[i].key; }
+    if(v == null) return null;
+    c += v; return c;
+  });
 }
 
-/* ---------- 导出 Excel ---------- */
-function exportExcel(m){
+function buildReport(m, st){
   const cfg = METRICS[m];
-  const wb = XLSX.utils.book_new();
-  const st = getState(m);
-  if(!RAW[st.date]){ alert("所选日期暂无数据"); return; }
+  if(m === "realtime" || m === "entrance") return null;
+  const spec = bucketSpec(st, m);
+  if(!spec) return null;
+  const region = cfg.hasRegion ? st.region : null;
+  const dayMode = isIntra(st);
+  const tCol = st.type === "custom" ? "时间（半小时）" : (st.type === "hourly" ? "时间" : "日期");
+  const notes = [], rows = [];
+  const buckets = spec.buckets;
+  const chart = { labels: buckets.map(b => b.label), ticks: buckets.map(b => b.tick || b.label), series: [] };
+  if(!buckets.length || buckets.every(b => b.offline)) return null;
+  const lastKey = buckets[buckets.length-1].key;
 
-  if(m === "realtime"){
-    const regions = st.region === "全区域" ? REGIONS : [st.region];
-    const fromMin = st.from * 30, toMin = Math.min(st.to * 30, 24 * 60);
-    const lastMin = lastDataMinute(st.date);
-    /* sheet 1：小时最高人数 */
-    const hourRows = [];
-    regions.forEach(rg => {
-      for(let h = 0; h < HOURS; h++){
-        const sMin = Math.max(h * 60, fromMin), eMin = Math.min(h * 60 + 60, toMin);
-        if(sMin >= eMin) continue;
-        hourRows.push([`${fmtHM((sMin/60)|0, sMin%60)} – ${fmtHM(((eMin-1)/60)|0, (eMin-1)%60)}`, rg,
-          (eMin - 1) <= lastMin ? fmtRT(rtRangeMax(st.date, rg, sMin, eMin)) : "—"]);
-      }
-    });
-    const ws1 = XLSX.utils.aoa_to_sheet([["时间段","区域","小时最高实时人数（人）"], ...hourRows]);
-    ws1["!cols"] = [{wch:18},{wch:10},{wch:20}];
-    XLSX.utils.book_append_sheet(wb, ws1, "小时最高人数");
-    /* sheet 2：历史数据（每次上报的实时人数准确值） */
-    let histRows = [];
-    regions.forEach(rg => {
-      let count = 0;
-      RAW[st.date].realtime[rg].forEach(e => {
-        count = Math.max(0, count + e.delta);
-        const t = e.h * 60 + e.min;
-        if(t >= fromMin && t < toMin) histRows.push([fmtHM(e.h, e.min), rg, fmtRT(count)]);
-      });
-    });
-    histRows.sort((a,b) => a[0].localeCompare(b[0]));
-    const ws2 = XLSX.utils.aoa_to_sheet([["时间","区域","实时人数（人）"], ...histRows]);
-    ws2["!cols"] = [{wch:10},{wch:10},{wch:14}];
-    XLSX.utils.book_append_sheet(wb, ws2, "历史数据");
-    XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${st.date}_${spanLabel(st.from, st.to)}_${st.region}.xlsx`);
-    return;
+  if(m === "visits"){
+    const inc = buckets.map(b => incInBucket(b, "visits", region));
+    const cum = dayMode ? cumByKey(buckets, inc) : inc.slice();
+    /* 天级下增量与当日累计为同一数值，只保留一个数值列 */
+    const cols = dayMode ? [tCol, "区域", "增量人次", "累计人次"] : ["日期", "区域", "当日访问人次"];
+    buckets.forEach((b, i) => rows.push({ cells: dayMode
+      ? [{v:b.label},{v:region},{v: inc[i] == null ? "—" : "+" + inc[i], cls:"delta"},{v: cum[i] == null ? "—" : String(cum[i])}]
+      : [{v:b.label},{v:region},{v: inc[i] == null ? "—" : String(inc[i])}] }));
+    chart.series = dayMode ? [
+      { name:"增量人次", color: COLOR.blue, type:"bar", data: inc, unit:" 人次" },
+      { name:"累计人次", color: COLOR.violet, type:"line", data: cum, unit:" 人次", axis:"right" },
+    ] : [
+      { name:"当日访问人次", color: COLOR.blue, type:"bar", data: inc, unit:" 人次" },
+    ];
+    notes.push(cfg.formula);
+    notes.push("按时视图按每小时统计，自定义视图按每半小时统计，按日 / 按周 / 按月视图颗粒度为天。");
+    notes.push("跨天数据清零：时段视图的累计人次自所属日期统计起始时间滚动累加，天级每行为当日累计人次。");
+    notes.push("导出时按区域拆分为子 sheet，包含全部 " + REGIONS.length + " 个区域及全区域合计。");
+    return { cols, rows, chart, notes,
+      summary:[
+        {k:"统计区间", v: bucketEndLabel(st, spec), txt:true},
+        {k:"区间访问人次合计", v: String(sumArr(inc.filter(x => x != null))), u:"人次"},
+        {k: dayMode ? "截止当前累计" : "末日当日累计", v: String(cum[cum.length-1] || 0), u:"人次",
+         x: dayMode ? fmtMin(buckets[buckets.length-1].e - 1) : lastKey},
+        {k:"区域", v: region, txt:true},
+      ] };
   }
 
   if(m === "dwell"){
-    const isZone = st.tab !== "hist";
-    if(isZone){
-      const dateKey = st.date;
-      if(!RAW[dateKey]){ alert("所选日期暂无数据"); return; }
-      if(dateKey === todayKey()){
-        /* 当天：分时累计 */
-        const rows = dwellCumRows(dateKey, st.region);
-        const data = [["时间段","时段访问人次（人次）","时段累计驻留（人·分钟）","平均驻留时长（分钟）"]];
-        rows.forEach(r => data.push([r.label, r.visits, r.personMin, (+r.avg).toFixed(1)]));
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        ws["!cols"] = [{wch:18},{wch:22},{wch:26},{wch:22}];
-        XLSX.utils.book_append_sheet(wb, ws, "当天分时累计");
-        XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${dateKey}_当天_${st.region}.xlsx`);
-      }else{
-        /* 历史日期：全天总览 + 分时累计 */
-        const overview = [...REGIONS, "全区域"].map(rg => ({ rg, ...dwellDayTotal(dateKey, rg) }));
-        const data1 = [["区域","访问人次（人次）","累计驻留（人·分钟）","平均驻留时长（分钟）"]];
-        overview.forEach(r => data1.push([r.rg, r.visits, r.personMin, (+r.avg).toFixed(1)]));
-        const ws1 = XLSX.utils.aoa_to_sheet(data1);
-        ws1["!cols"] = [{wch:10},{wch:20},{wch:24},{wch:22}];
-        XLSX.utils.book_append_sheet(wb, ws1, "全天总览");
-        const rows = dwellCumRows(dateKey, st.region);
-        const data2 = [["时间段","时段访问人次（人次）","时段累计驻留（人·分钟）","平均驻留时长（分钟）"]];
-        rows.forEach(r => data2.push([r.label, r.visits, r.personMin, (+r.avg).toFixed(1)]));
-        const ws2 = XLSX.utils.aoa_to_sheet(data2);
-        ws2["!cols"] = [{wch:18},{wch:22},{wch:26},{wch:22}];
-        XLSX.utils.book_append_sheet(wb, ws2, "分时累计");
-        XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${dateKey}_全天_${st.region}.xlsx`);
-      }
-    }else{
-      /* 历史对比：矩阵（近 → 远，跟随所选日期范围） */
-      const range = (st.range === 30) ? 30 : 7;
-      const datesAsc = Object.keys(RAW).sort().slice(-range);
-      const regionCols = [...REGIONS, "全区域"];
-      const matrix = dwellHistMatrix()
-        .filter(r => datesAsc.indexOf(r.date) >= 0)
-        .sort((a,b) => b.date.localeCompare(a.date));
-      const data = [["日期", ...regionCols.map(c => c + "（分钟）")]];
-      matrix.forEach(r => data.push([r.date + (r.date === todayKey() ? "（截至当前）" : ""), ...regionCols.map(c => (+r[c]).toFixed(1))]));
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      ws["!cols"] = [{wch:16}, ...regionCols.map(()=>({wch:12}))];
-      XLSX.utils.book_append_sheet(wb, ws, "历史对比");
-      XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_历史对比_近${range}天_${st.region}.xlsx`);
-    }
-    return;
+    const cols = [tCol, "区域", "访问人次", "驻留时长（人·分钟）", "平均驻留时长（分钟）"];
+    const data = buckets.map(b => dwellInBucket(b, region));
+    const cumMin = [], cumVis = [];
+    data.forEach(d => { cumMin.push(d ? d.personMin : null); cumVis.push(d ? d.visits : null); });
+    buckets.forEach((b, i) => {
+      const d = data[i];
+      const avg = d ? (d.visits ? d.avg : null) : undefined;
+      rows.push({ cells:[
+        {v:b.label},{v:region},
+        {v: d ? String(d.visits) : "—"},
+        {v: d ? String(d.personMin) : "—", cls:"delta"},
+        {v: d ? (avg == null ? "—" : avg.toFixed(1)) : "—", cls: d && avg == null ? "na" : ""}] });
+    });
+    /* 图表只呈现公式直接相关的两项：访问人次（柱）与驻留时长（柱），平均驻留时长用折线 */
+    chart.series = [
+      { name:"访问人次", color: COLOR.cyan, type:"bar", data: data.map(d => d ? d.visits : null), unit:" 人次" },
+      { name:"驻留时长（人·分钟）", color: COLOR.violet, type:"bar", data: data.map(d => d ? d.personMin : null), unit:" 人·分钟", axis:"right" },
+      { name:"平均驻留时长", color: COLOR.amber, type:"line", data: data.map(d => d && d.visits ? d.avg : null), unit:" 分钟", dec:1, axis:"right" },
+    ];
+    chart.axisNote = "左轴：访问人次（人次）｜右轴：驻留时长（人·分钟）· 平均驻留时长（分钟）";
+    notes.push(cfg.formula);
+    notes.push("名称统一：图与表中的「访问人次」「驻留时长（人·分钟）」「平均驻留时长（分钟）」为同一口径，驻留时长 = Σ(实时人数 × 该实时人数持续时长)，平均驻留时长 = 驻留时长 ÷ 访问人次。");
+    notes.push("按时视图 X 轴颗粒度为 1 小时，自定义视图为 30 分钟，按日 / 按周 / 按月视图为天。");
+    notes.push("跨天数据清零：每行展示该时段的驻留时长与访问人次，不做跨时段累计。");
+    notes.push("导出时按区域拆分为子 sheet，包含全部 " + REGIONS.length + " 个区域及全区域合计。");
+    const totVis = data.filter(d => d).reduce((s,d) => s + d.visits, 0);
+    const totMin = data.filter(d => d).reduce((s,d) => s + d.personMin, 0);
+    return { cols, rows, chart, notes,
+      summary:[
+        {k:"统计区间", v: bucketEndLabel(st, spec), txt:true},
+        {k:"访问人次", v: String(totVis), u:"人次", x:"区间合计"},
+        {k:"驻留时长（人·分钟）", v: String(totMin), x:"区间合计"},
+        {k:"平均驻留时长", v: totVis ? (totMin / totVis).toFixed(1) : "—", u:"分钟", x:"区间合计"},
+        {k:"区域", v: region, txt:true},
+      ] };
   }
 
-  const rows = buildRows(m);
-  const data = [cfg.cols];
-  rows.forEach(r => {
-    const row = [r.label];
-    if(cfg.hasRegion) row.push(r.region);
-    row.push(r.inc, r.cum);
-    data.push(row);
-  });
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws["!cols"] = cfg.cols.map(()=>({wch:18}));
-  XLSX.utils.book_append_sheet(wb, ws, cfg.name);
-  const rg = cfg.hasRegion ? "_" + st.region : "";
-  XLSX.writeFile(wb, `AqaraStudio_${cfg.name}_${st.date}_${spanLabel(st.from, st.to)}${rg}.xlsx`);
+  /* 行走距离：仅全局，不分区域 */
+  const dInc = buckets.map(b => incInBucket(b, "distance"));
+  const dCum = dayMode ? cumFrom(dInc) : dInc.slice();
+  const cols = dayMode ? [tCol, "增量行走距离（米）", "累计行走距离（米）"] : ["日期", "当日行走距离（米）"];
+  buckets.forEach((b, i) => rows.push({ cells: dayMode
+    ? [{v:b.label},{v: dInc[i] == null ? "—" : "+" + dInc[i], cls:"delta"},{v: dCum[i] == null ? "—" : String(dCum[i])}]
+    : [{v:b.label},{v: dInc[i] == null ? "—" : String(dInc[i])}] }));
+  chart.series = dayMode ? [
+    { name:"增量行走距离", color: COLOR.teal, type:"bar", data: dInc, unit:" 米" },
+    { name:"累计行走距离", color: COLOR.blue, type:"line", data: dCum, unit:" 米", axis:"right" },
+  ] : [
+    { name:"当日行走距离", color: COLOR.teal, type:"bar", data: dInc, unit:" 米" },
+  ];
+  notes.push(cfg.formula);
+  notes.push("选择「日」时统计图 X 轴颗粒度固定为 1 小时，选择「周 / 月 / 自定义」时颗粒度为天。");
+  notes.push("跨天数据清零；行走距离仅全局显示该数据，不分区域。");
+  return { cols, rows, chart, notes,
+    summary:[
+      {k:"统计区间", v: bucketEndLabel(st, spec), txt:true},
+      {k:"区间行走距离合计", v: String(sumArr(dInc.filter(x => x != null))), u:"米"},
+      {k: dayMode ? "截止当前累计" : "末日当日行走距离", v: String(dCum[dCum.length-1] || 0), u:"米",
+       x: dayMode ? fmtMin(buckets[buckets.length-1].e - 1) : lastKey},
+    ] };
 }
 
+/* 历史数据区标题：按时=当天逐小时；按日/周/月/自定义=逐日 */
+function histLabel(st, m){
+  const halfHour = !!m && m !== "realtime";
+  const map = { hourly:"按时数据（当天 24 小时 · " + (halfHour ? "每半小时" : "每小时") + "）", day:"按日数据（逐日历史）",
+    week:"按周数据（周内逐日）", month:"按月数据（月内逐日）", custom:"自定义区间数据（每半小时）" };
+  return "历史数据统计 · " + map[st.type];
+}
+/* ---------- 实时人数：当下值表（可刷新）+ 分时人数（实际上报值）+ 每小时最大值（统计值） ---------- */
+function renderRealtime(){
+  const cfg = METRICS.realtime, st = getState("realtime");
+  document.getElementById("detailMain").innerHTML = detailHead(cfg) +
+    `<div id="liveBar"></div>
+     <div class="filters">${filterBarHTML("realtime", st)}</div><div id="rtWrap"></div>`;
+  bindFilterEvents("realtime", st, drawRealtime);
+  drawLive("realtime");
+  drawRealtime();
+}
+/* ---------- 实时数据（当下最新上报值，需手动刷新） ---------- */
+/* 实时层：以卡片直观呈现当下最新上报值（无需导出） */
+function liveRows(m){
+  const key = todayKey(), cov = RAW[key] ? RAW[key].cov : 0;
+  const lastReport = rg => {
+    const ev = rtEvList(key, rg);
+    if(ev && ev.length) return "最近上报 " + fmtHMS(ev[ev.length-1].t);
+    return "最近上报 " + fmtHM((cov/60)|0, cov%60);
+  };
+  if(m === "realtime")
+    return { title:"当前实时人数", unit:"人",
+      cards: ["全区域", ...REGIONS].map((rg,i) => ({ k:rg, v: fmtRT(rtAt(key, rg, cov)), sub: i === 0 ? "全屋在场合计" : lastReport(rg), hero: i === 0 })),
+      note: COPY.capNote + "「全区域」为各区域上报值合计，即该设备当前侦测到的在场总人数。" };
+  if(m === "visits")
+    return { title:"今日访问人次", unit:"人次",
+      cards: ["全区域", ...REGIONS].map((rg,i) => ({ k:rg, v: fmtNum(dayTotalVisits(key, rg)), sub: i === 0 ? "全屋合计 · 跨天清零" : lastReport(rg), hero: i === 0 })),
+      note: "今日访问人次 = Σ 实时访问人次增量，截至当前时刻；每半小时上报一次，跨天数据清零。" };
+  if(m === "dwell"){
+    const cards = ["全区域", ...REGIONS].map((rg,i) => {
+      const v = dayTotalVisits(key, rg), pm = dayTotalPersonMin(key, rg);
+      return { k:rg, v: v ? (pm / v).toFixed(1) : "—", sub: v ? "访问 " + v + " 人次 · 驻留 " + pm + " 人·分钟" : "访问人次为 0", hero: i === 0 };
+    });
+    return { title:"今日平均驻留时长", unit:"分钟", cards,
+      note: "平均驻留时长 = Σ(实时人数 × 该实时人数持续时长) ÷ 访问人次，截至当前时刻；访问人次为 0 时显示 “-”。" };
+  }
+  if(m === "distance")
+    return { title:"今日累计行走距离", unit:"米",
+      cards: [{ k:"全区域（不分区域）", v: fmtNum(daySlotsSum(key, "distance")), sub:"截至 " + fmtHM((cov/60)|0, cov%60) + " · 跨天清零", hero:true }],
+      note: "今日累计行走距离 = Σ 实时行走距离增量，仅全局显示该数据，不分区域；每半小时上报一次，跨天数据清零。" };
+  const occ = occAt(key, cov), raw = occRawAt(key, cov);
+  return { title:"当下进出口人流", unit:"人次", cards:[
+      { k:"空间驻留人数（校准后）", v: occ == null ? "—" : String(occ), unit:"人", hero:true, sub:"=（累计进入 − 累计离开）+ 校准人数" },
+      { k:"累计进入人次", v: String(daySlotsSum(key,"enter")), sub:"统计周期 " + (DEVICE.window.on ? fmtMin(DEVICE.window.start) + " – " + fmtMin(DEVICE.window.end) : "持续累计") },
+      { k:"累计离开人次", v: String(daySlotsSum(key,"exit")), sub:"原始驻留 " + (raw == null ? "—" : raw) + " 人 · 校准偏差 " + (DEVICE.calib ? ((DEVICE.calib.offset>0?"+":"") + DEVICE.calib.offset) : "0") },
+    ], note:"空间驻留人数由进出人次计算得到，最小值 0 不可为负；校准偏移仅作用于校准之后。" };
+}
+function drawLive(m){
+  const el = document.getElementById("liveBar");
+  if(!el) return;
+  const key = todayKey(), cov = currentMinute();
+  if(zoneMissing()){
+    el.innerHTML = `<div class="panel live"><div class="panel-title">实时数据<span class="tag-live">实时数据</span>
+      <a class="btn sm" href="#/zones" style="margin-left:auto">前往区域配置</a></div>
+      <div class="live-cards"><div class="live-card hero"><div class="lc-k">进出口未配置</div><div class="lc-v">—<span class="lc-u">人</span></div>
+      <div class="lc-s">划定进出口后开始统计</div></div></div></div>`;
+    return;
+  }
+  if(!RAW[key] || RAW[key].offline){
+    el.innerHTML = `<div class="panel live"><div class="panel-title">实时数据
+      <button class="btn ghost sm" id="liveRefresh" style="margin-left:auto">刷新</button></div>
+      <div class="empty" style="border:none;padding:18px 0">设备离线，暂无实时数据</div></div>`;
+    document.getElementById("liveRefresh").onclick = () => refreshLive(m);
+    return;
+  }
+  const cfg = liveRows(m);
+  el.innerHTML = `
+    <div class="panel live">
+      <div class="panel-title">${cfg.title}<span class="tag-live">实时数据</span>
+        <span class="badge on">${fmtMin(cov)} 上报值</span>
+        <span class="live-note">当下检测到的最新上报值，需手动刷新获取</span>
+        <button class="btn sm" id="liveRefresh" style="margin-left:auto">刷新</button>
+      </div>
+      <div class="live-cards">
+        ${cfg.cards.map(c => `<div class="live-card ${c.hero?"hero":""}">
+            <div class="lc-k">${c.k}</div>
+            <div class="lc-v">${c.v}<span class="lc-u">${c.unit || cfg.unit}</span></div>
+            ${c.sub ? `<div class="lc-s">${c.sub}</div>` : ""}
+          </div>`).join("")}
+      </div>
+      <div class="note">${cfg.note}</div>
+    </div>`;
+  document.getElementById("liveRefresh").onclick = () => refreshLive(m);
+}
+function refreshLive(m){
+  Object.keys(evCache).forEach(k => delete evCache[k]);
+  genData();
+  drawLive(m);
+  if(m === "realtime") drawRealtime(); else drawReport(m);
+  toast("实时数据已刷新至 " + fmtMin(currentMinute()));
+}
+/* 分时人数：按上报逐条绘制，事件精确到秒（一秒内可能多条，全部绘制） */
+function rtLogRows(st, spec, region){
+  const rows = [];
+  const multi = st.type !== "hourly";
+  spec.buckets.forEach(b => {
+    const list = rtEvList(b.key, region); if(!list) return;
+    const s0 = b.s * 60, s1 = Math.min(b.e, statCovOf(b.key)) * 60;
+    list.forEach(e => {
+      if(e.t < s0 || e.t >= s1) return;
+      rows.push({ sec:e.t, t:(multi ? fmtMD(b.key) + " " : "") + fmtHMS(e.t), v:e.v });
+    });
+  });
+  rows.sort((a, b) => a.sec - b.sec);
+  return rows;
+}
+function fmtHMS(sec){
+  const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = sec % 60;
+  return fmtHM(h, m) + ":" + String(s).padStart(2,"0");
+}
+function rtReportSeries(st, spec, region){
+  const rows = rtLogRows(st, spec, region);
+  return { labels: rows.map(r => r.t), ticks: rows.map(r => fmtHM(Math.floor(r.sec/3600), Math.floor(r.sec/60)%60)), values: rows.map(r => r.v), secs: rows.map(r => r.sec) };
+}
+/* 统计值图：按时 → 每小时最大值；自定义 → 每半小时最大值；按日 / 周 / 月 → 每日最大值 */
+function rtHourSeries(st, spec, region){
+  let buckets = spec.buckets;
+  if(st.type === "hourly"){
+    const lim = statCovOf(st.date);
+    buckets = [];
+    for(let s = 0; s < lim; s += 60){
+      const e = Math.min(s + 60, lim);
+      buckets.push({ key: st.date, label: fmtHM((s/60)|0, 0) + " – " + fmtHM(((e-1)/60)|0, (e-1)%60), tick: fmtHM((s/60)|0, 0), s, e });
+    }
+  }
+  return { labels: buckets.map(b => b.label), values: buckets.map(b => rtMax(b, region)), buckets };
+}
+function drawRealtime(){
+  const st = getState("realtime");
+  const wrap = document.getElementById("rtWrap");
+  const spec = bucketSpec(st, "realtime");
+  if(!spec || spec.offline){ wrap.innerHTML = `<div class="empty">设备离线，所选时间段无数据</div>`; return; }
+  const region = st.region;
+  const dayMode = spec.kind === "intraday";
+  const peak = spec.buckets.map(b => rtMax(b, region)).filter(v => v != null).reduce((a,b)=>Math.max(a,b), 0);
+  const ser = dayMode ? rtReportSeries(st, spec, region) : { labels: spec.buckets.map(b => b.label), values: spec.buckets.map(b => rtMax(b, region)) };
+  const rep = { labels: ser.labels, values: ser.values,
+    rows: ser.labels.map((t, i) => ({ cells: [{v:t},{v:region},{v: fmtRT(ser.values[i]), cls: ser.values[i] == null ? "na" : ""}] })) };
+  const hrs = rtHourSeries(st, spec, region);
+  const granTxt = "按上报逐条（分钟级，有变化即上报）";
+  const spanCol = st.type === "custom" ? "时间段（半小时）" : (st.type === "hourly" ? "时间段（1 小时）" : "日期");
+  const statName = st.type === "custom" ? "每半小时实时人数最大值" : (st.type === "hourly" ? "每小时实时人数最大值" : "每日实时人数最大值");
+  const notes = [
+    "「分时人数」为历史上报记录：每个数据点即设备一次实时人数上报的准确值（人数发生变化时上报）。",
+    "「" + statName + "」为统计值：取每个统计区间内实时人数的最大值，两者口径不同。",
+    COPY.capNote,
+    "按时视图 X 轴颗粒度支持 1 分钟 ~ 1 小时动态调整；自定义视图按半小时统计；按日 / 按周 / 按月视图按天统计。",
+    "导出时按区域拆分为子 sheet（含时段最高与上报明细），包含全部 " + REGIONS.length + " 个区域及全区域合计。",
+  ];
+  const summary = [
+    {k:"统计区间", v: bucketEndLabel(st, spec), txt:true},
+    {k:"区间最高实时人数", v: fmtRT(peak), u:"人"},
+    {k:"区间上报次数", v: String(rep.labels.length), u:"次"},
+    {k:"区域", v: region, txt:true},
+  ];
+  wrap.innerHTML = `
+    <div class="hist-label">${histLabel(st, "realtime")}</div>
+    ${summaryHTML(summary)}
+    ${dayMode ? `
+    <div class="panel">
+      <div class="panel-title">分时人数<span class="tag-a">实际上报值</span>
+        <span style="font-size:12px;color:var(--ink-3);font-weight:400">X 轴上报时刻（分钟级）· Y 轴实时人数 · ${granTxt} · 共 ${rep.rows.length} 条上报</span></div>
+      <div id="rtChartA"></div>
+    </div>` : ""}
+    <div class="panel">
+      <div class="panel-title">${statName}<span class="tag-b">统计值</span>
+        <span style="font-size:12px;color:var(--ink-3);font-weight:400">X 轴时间段 · Y 轴该时间段内实时人数最大值 · ${st.type === "custom" ? "每 30 分钟" : (st.type === "hourly" ? "每 1 小时" : "每 1 天")}</span></div>
+      <div id="rtChartB"></div>
+    </div>
+    <div class="section-title">历史数据</div>
+    <div class="hist-item">
+      <div class="panel-title">分时人数上报记录<span class="tag-a">实际上报值</span>
+        <span style="font-size:12px;color:var(--ink-3);font-weight:400">共 ${rep.rows.length} 条上报 · ${region}</span>
+        <span class="export-mini">
+          <button class="btn ghost sm" id="expHistCsv">导出 CSV</button>
+          <button class="btn ghost sm" id="expHistXls">导出 Excel</button>
+        </span>
+      </div>
+      <div class="tbl-wrap"><table><thead><tr><th>时间</th><th>区域</th><th>实时人数（人）</th></tr></thead>
+        <tbody>${rep.rows.length ? rep.rows.map(r => `<tr>${r.cells.map(c => `<td class="${c.cls||""}">${c.v}</td>`).join("")}</tr>`).join("")
+          : `<tr><td colspan="3" style="text-align:center;color:var(--ink-3)">所选时间段内无上报记录</td></tr>`}</tbody></table></div>
+    </div>
+    <div class="hist-item">
+      <div class="panel-title">${statName}<span class="tag-b">统计值</span>
+        <span style="font-size:12px;color:var(--ink-3);font-weight:400">共 ${hrs.buckets.length} 个时间段 · ${region}</span>
+        <span class="export-mini">
+          <button class="btn ghost sm" id="expHourCsv">导出 CSV</button>
+          <button class="btn ghost sm" id="expHourXls">导出 Excel</button>
+        </span>
+      </div>
+      <div class="tbl-wrap"><table><thead><tr>${[spanCol,"区域","最高实时人数（人）"].map(c=>`<th>${c}</th>`).join("")}</tr></thead>
+        <tbody>${hrs.buckets.map(b => { const v = rtMax(b, region);
+          return `<tr><td>${b.label}</td><td>${region}</td><td class="${v == null ? "na" : ""}">${fmtRT(v)}</td></tr>`; }).join("")}</tbody></table></div>
+    </div>
+    ${notesBlock(notes)}`;
+  const histTbl = { cols: ["时间","区域","实时人数（人）"], rows: rep.rows };
+  [["expHistCsv","csv","hist"],["expHistXls","xlsx","hist"],["expHourCsv","csv","hour"],["expHourXls","xlsx","hour"]].forEach(([id,ext,kind]) => {
+    const btn = document.getElementById(id); if(!btn) return;
+    btn.onclick = () => exportTable("realtime", kind, ext);
+  });
+  if(dayMode) renderChart(document.getElementById("rtChartA"), { labels: rep.labels, ticks: rep.ticks, series:[
+    { name:"实时人数（上报值）", color: COLOR.blue, type:"bar", cap:true, unit:" 人", data: rep.values } ] });
+  renderChart(document.getElementById("rtChartB"), { labels: hrs.labels, ticks: hrs.buckets.map(b => b.tick || b.label), series:[
+    { name:"最高实时人数", color: COLOR.violet, type:"bar", cap:true, unit:" 人", data: hrs.values } ] });
+}
+function rtHistReport(st, spec, region){
+  const cols = ["时间", "区域", "实时人数（人）"];
+  const rows = rtLogRows(st, spec, region).map(r => ({ cells:[{v:r.t},{v:region},{v: fmtRT(r.v)}] }));
+  return { cols, rows };
+}
+
+/* ---------- 进出口人流统计 ---------- */
+function renderEntrance(){
+  const cfg = METRICS.entrance, st = getState("entrance");
+  document.getElementById("detailMain").innerHTML = detailHead(cfg) + offlineBanner() +
+    configBarHTML(true) +
+    `<div id="liveBar"></div><div class="filters">${filterBarHTML("entrance", st)}</div><div id="reportWrap"></div>`;
+  bindFilterEvents("entrance", st, () => drawReport("entrance"));
+  bindConfigBar();
+  drawLive("entrance");
+  const yes = document.getElementById("calibYes");
+  if(yes) yes.onclick = () => { DEVICE.prompted = true; openCalibModal(); };
+  const no = document.getElementById("calibNo");
+  if(no) no.onclick = () => { DEVICE.prompted = true; render(); };
+  drawReport("entrance");
+}
+function buildEntranceReport(st){
+  if(zoneMissing()) return null;
+  const spec = bucketSpec(st, "entrance");
+  if(!spec || !spec.buckets.length) return null;
+  const dayMode = isIntra(st);
+  const tCol = st.type === "custom" ? "时间（半小时）" : "时间";
+  const cols = dayMode
+    ? [tCol, "增量进入人次", "累计进入人次", "增量离开人次", "累计离开人次", "最高空间驻留人数（人）"]
+    : ["日期", "累计进入人次", "累计离开人次", "最高空间驻留人数（人）"];
+  const blank = {v:"—", cls:"na"};
+  const rows = [];
+  let cumE = 0, cumX = 0, prevKey = null;
+  spec.buckets.forEach((b, i) => {
+    const day = RAW[b.key];
+    if(!day || day.offline){
+      rows.push({ cells: dayMode ? [{v:b.label}, blank, blank, blank, blank, {v:"—", cls:"na"}] : [{v:b.label}, blank, blank, blank] });
+      return;
+    }
+    if(i === 0 || b.key !== prevKey) { cumE = 0; cumX = 0; prevKey = b.key; }   // 跨天清零
+    const incE = incInBucket(b, "enter"), incX = incInBucket(b, "exit");
+    cumE += incE || 0; cumX += incX || 0;
+    const peak = occMaxIn(b);
+    const cells = [{v:b.label}];
+    if(dayMode) cells.push({v:"+" + incE, cls:"delta"},{v:String(cumE)},{v:"+" + incX, cls:"delta"},{v:String(cumX)});
+    else cells.push({v:String(cumE)},{v:String(cumX)});
+    cells.push({v: peak == null ? "—" : String(peak)});
+    rows.push({ cells });
+  });
+  const peakAll = spec.buckets.map(b => occMaxIn(b)).filter(v => v != null).reduce((a,b)=>Math.max(a,b), 0);
+  const cur = occAt(st.type === "hourly" ? st.date : st.range.to, st.type === "hourly" ? currentMinute() : 1439);
+  const chartSeries = [];
+  if(dayMode){
+    chartSeries.push({ name:"增量进入人次", color: COLOR.blue, type:"bar", data: spec.buckets.map(b => incInBucket(b,"enter")), unit:" 人次" });
+    chartSeries.push({ name:"增量离开人次", color: COLOR.green, type:"bar", data: spec.buckets.map(b => incInBucket(b,"exit")), unit:" 人次" });
+  }
+  chartSeries.push({ name:"累计进入人次", color: COLOR.amber, type:"line", axis:"right", unit:" 人次", data: cumByKey(spec.buckets, spec.buckets.map(b => incInBucket(b,"enter"))) });
+  chartSeries.push({ name:"累计离开人次", color: COLOR.pink, type:"line", axis:"right", unit:" 人次", data: cumByKey(spec.buckets, spec.buckets.map(b => incInBucket(b,"exit"))) });
+  chartSeries.push({ name:"最高空间驻留人数", color: COLOR.violet, type:"line", axis:"right", unit:" 人", data: spec.buckets.map(b => occMaxIn(b)) });
+  const cutoff = Math.min(DEVICE.window.on ? DEVICE.window.end : 1439, statCovOf(st.date) - 1);
+  const notes = [
+    METRICS.entrance.formula,
+    dayMode
+      ? (st.type === "custom" ? "自定义视图" : "按时视图") + "统计颗粒度为半小时，首尾时间与统计起止时间一致（当前 "
+          + fmtMin(DEVICE.window.on ? DEVICE.window.start : 0) + " – " + fmtHM((cutoff / 60) | 0, cutoff % 60) + "）。"
+      : "按日 / 按周 / 按月视图颗粒度为天级，每天独立按统计起止时间统计，跨天清零。",
+    "「分时进出与驻留」为设备实际变化上报值；本表为半小时统计维度：进入 / 离开人次为该半小时累计，空间驻留人数取该半小时内的最高值。",
+    "手动校准偏移只影响校准操作之后的实时驻留计算，不回溯修改历史报表数据；修改统计时间段同样不回溯历史报表数据。",
+    "累计进入 / 离开人次仅全局显示该数据；到达统计截止时间自动清零本周期累计。",
+  ];
+  return { cols, rows, notes,
+    chart: { labels: spec.buckets.map(b => b.label), ticks: spec.buckets.map(b => b.tick || b.label), series: chartSeries,
+      title: dayMode ? "半小时人流与最高空间驻留" : "每日人流与最高空间驻留", tag:"统计值",
+      grain: dayMode ? "30 分钟颗粒" : "1 天颗粒",
+      axisNote: "左轴：增量人次｜右轴：累计人次 · 最高空间驻留人数" },
+    summary:[
+      {k:"统计区间", v: bucketEndLabel(st, spec), txt:true},
+      {k:"当前空间驻留人数", v: cur == null ? "—" : String(cur), u:"人", x:"含校准偏差 " + (DEVICE.calib ? ((DEVICE.calib.offset>0?"+":"") + DEVICE.calib.offset) : "0")},
+      {k:"区间累计进入", v: String(cumE), u:"人次"},
+      {k:"区间累计离开", v: String(cumX), u:"人次"},
+      {k:"区间最高空间驻留", v: String(peakAll), u:"人"},
+    ] };
+}
+
+/* ---------- 图表 ---------- */
+function chartPanel(m, st, rep){
+  if(!rep || !rep.chart || !rep.chart.series || !rep.chart.series.length) return "";
+  const names = rep.chart.series.map(s => s.name);
+  if(!st.series || !st.series.some(n => names.indexOf(n) >= 0)) st.series = names.slice();
+  else st.series = st.series.filter(n => names.indexOf(n) >= 0);
+  return `
+    <div class="panel">
+      <div class="panel-title">${rep.chart.title || "统计图"}${rep.chart.tag ? `<span class="tag-${rep.chart.tag === "统计值" ? "b" : "a"}">${rep.chart.tag}</span>` : ""}
+        <span style="font-size:12px;color:var(--ink-3);font-weight:400">X 轴时间 · Y 轴统计指标${rep.chart.grain ? " · " + rep.chart.grain : ""}${rep.chart.axisNote ? " · " + rep.chart.axisNote : ""}</span>
+        <div class="series-toggles" id="serTog">
+          ${rep.chart.series.map(s => `<button data-s="${s.name}" class="${st.series.indexOf(s.name)>=0?"on":""}">
+            <span class="sw" style="background:${s.color}"></span>${s.name}</button>`).join("")}
+        </div>
+      </div>
+      <div id="chart"></div>
+    </div>`;
+}
+function bindChart(m, st, rep){
+  const tog = document.getElementById("serTog");
+  if(tog) tog.addEventListener("click", e => {
+    const b = e.target.closest("button"); if(!b) return;
+    const name = b.dataset.s;
+    const i = st.series.indexOf(name);
+    if(i >= 0){ if(st.series.length > 1) st.series.splice(i, 1); } else st.series.push(name);
+    if(m === "realtime") drawRealtime(); else drawReport(m);
+  });
+  const el = document.getElementById("chart");
+  if(el && rep && rep.chart){
+    const visible = (rep.chart.series || []).filter(s => st.series.indexOf(s.name) >= 0);
+    renderChart(el, { labels: rep.chart.labels, ticks: rep.chart.ticks, series: visible });
+  }
+}
+function renderChart(el, cfg){
+  let series = (cfg.series || []).filter(s => s.data && s.data.some(v => v != null));
+  const labels = cfg.labels;
+  if(!series.length || !labels.length){ el.innerHTML = `<div class="empty">所选时间段无数据</div>`; return; }
+  const W = Math.max(el.clientWidth || 0, 320), H = 300, mL = 50, mT = 14, mB = 34;
+  if(!series.some(s => (s.axis || "left") === "left") && series.some(s => s.axis === "right")){
+    series = series.map(s => Object.assign({}, s, { axis:"left" }));
+  }
+  let dual = series.some(s => (s.axis || "left") === "left") && series.some(s => s.axis === "right");
+  const mR = dual ? 56 : 16;
+  const ticks = (cfg.ticks && cfg.ticks.length === labels.length) ? cfg.ticks : labels;
+  const pw = W - mL - mR, ph = H - mT - mB, n = labels.length;
+  const capAxis = axis => series.some(s => (s.axis || "left") === axis && s.cap);
+  const scaleOf = axis => {
+    if(capAxis(axis)) return RT_CAP;                         // 实时人数轴按产品定义固定 0~10
+    const vals = series.filter(s => (s.axis || "left") === axis).flatMap(s => s.data).filter(v => v != null);
+    const mx = vals.length ? Math.max.apply(null, vals) : 0;
+    if(mx <= 0) return 1;
+    if(mx < 20) return Math.max(1, Math.ceil(mx / 4)) * 4;   // 人数等小数值用整数刻度，避免出现 3.5 人
+    return mx < 200 ? Math.ceil(mx * 1.15) : mx * 1.15;
+  };
+  const maxL = scaleOf("left"), maxR = scaleOf("right");
+  if(dual && Math.round(maxR) === Math.round(maxL)) dual = false;   // 两轴量程一致时不重复标注
+  const x = i => mL + (n > 1 ? i * pw / (n - 1) : pw / 2);
+  const xc = i => mL + (i + 0.5) * pw / n;
+  const y = (v, axis) => { const lim = axis === "right" ? maxR : maxL; return mT + ph - (Math.min(v, lim) / lim) * ph; };
+  const bandW = Math.max(3, Math.min(30, pw / n * 0.62));
+  const barList = series.filter(z => z.type === "bar");
+  const subW = barList.length > 1 ? Math.max(2, bandW / barList.length - 1) : bandW;
+  let s = "";
+  const gridN = capAxis("left") ? 5 : 4;                      // 0~10 用整数刻度 0/2/4/6/8/10
+  for(let g = 0; g <= gridN; g++){
+    const yy = mT + ph * g / gridN;
+    s += `<line x1="${mL}" y1="${yy.toFixed(1)}" x2="${(mL+pw).toFixed(1)}" y2="${yy.toFixed(1)}" stroke="#f0f1f5"/>`;
+    s += `<text x="${mL-9}" y="${(yy+4).toFixed(1)}" text-anchor="end" font-size="11" fill="#5b5f6e">${axLabel(maxL*(gridN-g)/gridN)}</text>`;
+    if(dual) s += `<text x="${(mL+pw+9).toFixed(1)}" y="${(yy+4).toFixed(1)}" font-size="11" fill="#5b5f6e">${axLabel(maxR*(gridN-g)/gridN)}</text>`;
+  }
+  const step = Math.max(1, Math.ceil(n / 9));
+  for(let i = 0; i < n; i += step){
+    s += `<text x="${(n===1?x(0):xc(i)).toFixed(1)}" y="${(H-13)}" text-anchor="middle" font-size="11" fill="#5b5f6e">${ticks[i]}</text>`;
+  }
+  barList.forEach((sr, bi) => {
+    const off = (bi - (barList.length - 1) / 2) * (subW + 1);
+    sr.data.forEach((v, i) => {
+      if(v == null) return;
+      const yy = y(v, sr.axis || "left"), h = mT + ph - yy;
+      const cx = (n === 1 ? x(0) : xc(i)) + off - subW / 2;
+      s += `<rect x="${cx.toFixed(1)}" y="${yy.toFixed(1)}" width="${subW.toFixed(1)}" height="${Math.max(1,h).toFixed(1)}" fill="${sr.color}" opacity=".82" rx="1"/>`;
+    });
+  });
+  series.filter(z => z.type === "line").forEach(sr => {
+    let d = "", open = false;
+    sr.data.forEach((v, i) => {
+      if(v == null){ open = false; return; }
+      const cx = n === 1 ? x(0) : x(i), cy = y(v, sr.axis || "left");
+      d += (open ? "L" : "M") + cx.toFixed(1) + " " + cy.toFixed(1) + " "; open = true;
+    });
+    if(d) s += `<path d="${d}" fill="none" stroke="${sr.color}" stroke-width="2" stroke-linejoin="round"/>`;
+    if(n <= 32) sr.data.forEach((v, i) => {
+      if(v == null) return;
+      s += `<circle cx="${(n===1?x(0):x(i)).toFixed(1)}" cy="${y(v, sr.axis||"left").toFixed(1)}" r="2.8" fill="#fff" stroke="${sr.color}" stroke-width="1.6"/>`;
+    });
+  });
+  for(let i = 0; i < n; i++){
+    const bw = pw / n, bx = n === 1 ? mL : mL + i * bw;
+    s += `<rect class="hit" data-i="${i}" x="${bx.toFixed(1)}" y="${mT}" width="${bw.toFixed(1)}" height="${ph}" fill="transparent"/>`;
+  }
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="display:block">${s}</svg>`;
+  const svg = el.querySelector("svg");
+  svg.addEventListener("mousemove", ev => {
+    const t = ev.target.closest ? ev.target.closest(".hit") : null;
+    if(!t){ hideTip(); return; }
+    const i = +t.dataset.i;
+    const lines = series.map(sr => {
+      const v = sr.data[i];
+      const txt = v == null ? "—" : (sr.cap ? fmtRT(v) : axLabel(v, sr.dec)) + (sr.unit || "");
+      return `<div class="tr"><span class="sw" style="background:${sr.color}"></span>${sr.name}<span class="tv">${txt}</span></div>`;
+    }).join("");
+    showTip(ev, `<div class="tt">${labels[i]}</div>${lines}`);
+  });
+  svg.addEventListener("mouseleave", hideTip);
+}
+function axLabel(v, dec){
+  if(v == null) return "—";
+  if(dec != null) return (+v).toFixed(dec);
+  const a = Math.abs(v);
+  if(a >= 10000) return (v / 10000).toFixed(a >= 100000 ? 0 : 1) + "万";
+  if(a >= 10) return String(Math.round(v));
+  if(Number.isInteger(v)) return String(v);
+  return v.toFixed(1);
+}
+const tipEl = document.getElementById("tip");
+function showTip(ev, html){
+  tipEl.innerHTML = html; tipEl.style.display = "block";
+  const r = tipEl.getBoundingClientRect();
+  let l = ev.clientX + 14, t = ev.clientY - r.height / 2;
+  if(l + r.width > innerWidth - 10) l = ev.clientX - r.width - 14;
+  if(t < 8) t = 8;
+  if(t + r.height > innerHeight - 8) t = innerHeight - r.height - 8;
+  tipEl.style.left = l + "px"; tipEl.style.top = t + "px";
+}
+function hideTip(){ tipEl.style.display = "none"; }
+
+/* =========================================================
+ * 导出（Excel 按区域分子 sheet / CSV；文件名 = 设备名称 + 报表起止时间）
+ * ========================================================= */
+function sheetsFor(m, kind){
+  if(m === "dwell") return dwellSheets();
+  const st = getState(m);
+  const cfg = METRICS[m];
+  const spec = bucketSpec(st, m);
+  if(!spec || !spec.buckets.length) return null;
+  const dayMode = st.type === "hourly";
+  const out = [];
+  const rowLabel = b => dayMode ? b.label : b.key;
+  if(m === "entrance" || m === "distance"){
+    const rep = m === "entrance" ? buildEntranceReport(st) : buildReport(m, st);
+    out.push({ name: cfg.name, cols: rep.cols, rows: rep.rows.map(r => r.cells.map(c => plain(c.v))) });
+    return out;
+  }
+  const regions = ["全区域", ...REGIONS];
+  if(m === "realtime"){
+    (kind === "hist" ? [] : regions).forEach(rg => {
+      const rows = spec.buckets.map(b => [rowLabel(b), rg, rtMax(b, rg) == null ? "-" : fmtRT(rtMax(b, rg))]);
+      out.push({ name: rg + " 时段统计", cols: [dayMode ? "时间" : "日期","区域","最高实时人数（人）"], rows });
+    });
+    (kind === "hour" ? [] : regions).forEach(rg => {
+      const rows = rtLogRows(st, spec, rg).map(r => [r.t, rg, fmtRT(r.v)]);
+      out.push({ name: rg + " 上报明细", cols: ["时间","区域","实时人数（人）"], rows });
+    });
+    return out;
+  }
+  if(m === "visits" && kind === "hour"){
+    return regions.map(rg => {
+      let run = 0;
+      const rows = spec.buckets.map(b => {
+        const inc = incInBucket(b, "visits", rg);
+        if(!dayMode) return [rowLabel(b), rg, inc == null ? "-" : inc];
+        if(inc == null) return [rowLabel(b), rg, "-", "-"];
+        run += inc; return [rowLabel(b), rg, inc, run];
+      });
+      return { name: rg, cols: dayMode ? ["时间","区域","增量人次","累计人次"] : ["日期","区域","当日访问人次"], rows };
+    });
+  }
+  if(m === "visits"){
+    regions.forEach(rg => {
+      let run = 0;
+      const rows = spec.buckets.map(b => {
+        const inc = incInBucket(b, "visits", rg);
+        if(!dayMode) return [rowLabel(b), rg, inc == null ? "-" : inc];
+        if(inc == null) return [rowLabel(b), rg, "-", "-"];
+        run += inc;
+        return [rowLabel(b), rg, inc, run];
+      });
+      out.push({ name: rg, cols: dayMode ? ["时间","区域","增量人次","累计人次"] : ["日期","区域","当日访问人次"], rows });
+    });
+    return out;
+  }
+  return null;
+}
+/* 平均驻留时长导出：跟随当前板块——当天＝各区域分时累计；历史日期＝全天总览 + 所选区域分时累计；历史对比＝近 N 天倒序矩阵 */
+function dwellSheets(){
+  const st = getState("dwell");
+  if(st.dwTab === "hist"){
+    const n = st.dwRange, keys = [];
+    for(let i = n - 1; i >= 0; i--) keys.push(fmtDate(addDays(new Date(), -i)));
+    const colRgs = REGIONS.concat(["全区域"]);
+    const rows = keys.slice().reverse().map(k => {
+      const d = RAW[k];
+      return [k + (k === todayKey() ? "（截至当前）" : "")].concat(colRgs.map(rg => {
+        if(!d || d.offline) return "-";
+        const v = dayTotalVisits(k, rg), m = dayTotalPersonMin(k, rg);
+        return v ? (m / v).toFixed(1) : "-";
+      }));
+    });
+    return [{ name:"各日期各区域平均驻留时长", cols:["日期"].concat(colRgs), rows }];
+  }
+  const key = st.dwDate, region = st.region;
+  if(key === todayKey()){
+    return REGIONS.concat(["全区域"]).map(rg => {
+      const rs = dwellCumRows(key, rg);
+      return { name: rg + " 分时累计", cols: dwellCumCols(),
+        rows: rs.map(r => [r.label, r.inc, r.cumM, r.avg == null ? "-" : r.avg]) };
+    });
+  }
+  const ov = dwellDayOverview(key), cum = dwellCumRows(key, region);
+  return [
+    { name:"全天总览", cols:["区域", "访问人次（人次）", "累计驻留（人·分钟）", "平均驻留时长（分钟）"],
+      rows: ov.map(r => [r.rg, r.v, r.m, r.avg == null ? "-" : r.avg]) },
+    { name: region + " 分时累计", cols: dwellCumCols(),
+      rows: cum.map(r => [r.label, r.inc, r.cumM, r.avg == null ? "-" : r.avg]) },
+  ];
+}
+function plain(v){
+  const s = String(v).replace(/,/g, "").replace(/^\+/, "").replace(/（.*$/, "");
+  const n = Number(s);
+  return isNaN(n) || s === "" ? String(v) : n;
+}
+function fileName(m, ext, kind){
+  if(m === "dwell"){
+    const st = getState("dwell");
+    const span = st.dwTab === "hist"
+      ? fmtCompact(fmtDate(addDays(new Date(), -(st.dwRange - 1)))) + "-" + fmtCompact(todayKey())
+      : fmtCompact(st.dwDate) + "-" + fmtCompact(st.dwDate);
+    return `${DEVICE_NAME}_平均驻留时长_${span}.${ext}`;
+  }
+  const st = getState(m);
+  const from = isIntra(st) && st.type === "hourly" ? st.date : st.range.from;
+  const to = isIntra(st) && st.type === "hourly" ? st.date : st.range.to;
+  return `${DEVICE_NAME}_${tableTitle(m, kind)}_${fmtCompact(from)}-${fmtCompact(to)}.${ext}`;
+}
+function tableTitle(m, kind){
+  if(!kind) return METRICS[m].name;
+  if(m === "visits") return kind === "hist" ? "访问人次变化上报日志" : "访问人次半小时统计";
+  if(m === "distance") return kind === "hist" ? "行走距离变化上报日志" : "行走距离半小时统计";
+  if(m !== "realtime") return METRICS[m].name;
+  return kind === "hist" ? (m === "visits" ? "访问人次变化上报" : "实时人数上报记录") : "实时人数时段最大值";
+}
+function exportTable(m, kind, ext){
+  const sheets = sheetsFor(m, kind);
+  if(!sheets || !sheets.length){ alert("所选时间段无数据"); return; }
+  if(ext === "csv") return writeCSV(m, sheets, kind);
+  if(typeof XLSX === "undefined"){ alert("当前环境无法加载 Excel 导出组件，请联网后重试，或使用「导出 CSV」"); return; }
+  const wb = XLSX.utils.book_new();
+  appendSheets(wb, sheets);
+  XLSX.writeFile(wb, fileName(m, "xlsx", kind));
+}
+function exportExcel(m){
+  if(typeof XLSX === "undefined"){ alert("当前环境无法加载 Excel 导出组件，请联网后重试，或使用「导出 CSV」"); return; }
+  const sheets = sheetsFor(m);
+  if(!sheets){ alert("所选时间段无数据"); return; }
+  const wb = XLSX.utils.book_new();
+  appendSheets(wb, sheets);
+  XLSX.writeFile(wb, fileName(m, "xlsx"));
+}
+function appendSheets(wb, sheets){
+  sheets.forEach(sh => {
+    const ws = XLSX.utils.aoa_to_sheet([sh.cols, ...sh.rows]);
+    ws["!cols"] = sh.cols.map(() => ({wch: 20}));
+    XLSX.utils.book_append_sheet(wb, ws, sh.name.slice(0, 31));
+  });
+}
+function exportCSV(m){ writeCSV(m, sheetsFor(m)); }
+function writeCSV(m, sheets, kind){
+  if(!sheets || !sheets.length){ alert("所选时间段无数据"); return; }
+  const esc2 = c => { const s = String(c == null ? "-" : c); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+  const text = sheets.map(sh => `# ${sh.name}\n` + [sh.cols, ...sh.rows].map(r => r.map(esc2).join(",")).join("\n")).join("\n\n");
+  const blob = new Blob(["\ufeff" + text], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = fileName(m, "csv", kind);
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+/* =========================================================
+ * 弹窗：统计时间段 / 手动校准 / 进出口区域
+ * ========================================================= */
+function openWindowModal(){
+  const mask = document.createElement("div");
+  mask.className = "mask";
+  const cur = DEVICE.window;
+  mask.innerHTML = `<div class="modal">
+    <h3>统计时间段设置</h3>
+    <div class="body">
+      <div class="rows">
+        <div class="r"><label>功能开关</label><span class="sw ${cur.on?"on":""}" id="swOn"></span>
+          <span style="font-size:12px;color:var(--ink-3)">默认开启，仅控制累计进入 / 离开人次的清零逻辑</span></div>
+        <div class="r"><label>起始时间</label><input type="time" id="wStart" step="60" value="${fmtHM(Math.floor(cur.start/60)%24, cur.start%60)}"></div>
+        <div class="r"><label>截止时间</label><input type="time" id="wEnd" step="60" value="${fmtHM(Math.floor(cur.end/60)%24, cur.end%60)}"></div>
+      </div>
+      <div class="note" style="margin-top:14px">开启状态下统计周期默认 00:00:00 – 23:59:59，可自定义起止时间，截止时间允许设置为次日时刻，整个统计周期时长上限为 24 小时。到达截止时间后自动清空本周期累计数据，开启新一轮周期统计。中途修改起止时间立即生效并清空当前累计，按新起始时间基于设备上报增量重新计算当日数据；空间驻留人数与校准偏移量不受本次修改影响。</div>
+    </div>
+    <div class="foot"><button class="btn ghost" id="wCancel">取消</button><button class="btn" id="wSave">保存</button></div>
+  </div>`;
+  document.body.appendChild(mask);
+  let on = cur.on;
+  const sw = mask.querySelector("#swOn");
+  sw.onclick = () => { on = !on; sw.classList.toggle("on", on); };
+  mask.querySelector("#wCancel").onclick = () => mask.remove();
+  mask.querySelector("#wSave").onclick = () => {
+    const toMin = v => { const p = v.split(":").map(Number); return p[0] * 60 + p[1]; };
+    let s = toMin(mask.querySelector("#wStart").value);
+    let e = toMin(mask.querySelector("#wEnd").value);
+    if(e <= s) e += 24 * 60;
+    if(e - s > 24 * 60){ alert("整个统计周期时长上限为 24 小时"); return; }
+    DEVICE.window = { on, start: s, end: Math.min(e, 24 * 60 - 1) };
+    /* 开启 / 修改后立即清空当前累计并基于新起始时间重算 */
+    DEVICE.calib = null;
+    genData(); mask.remove(); render();
+  };
+}
+function openCalibModal(){
+  const key = todayKey();
+  const cov = currentMinute();
+  const raw = occRawAt(key, cov);
+  if(raw == null){ alert("设备离线，暂无可校准的数据"); return; }
+  const mask = document.createElement("div");
+  mask.className = "mask";
+  mask.innerHTML = `<div class="modal">
+    <h3>手动校准空间驻留人数</h3>
+    <div class="body">
+      <div style="font-size:12px;color:var(--ink-3);margin-bottom:10px">设备当前上报原始空间驻留人数 ${raw} 人（${fmtMin(cov)}）</div>
+      <div class="rows">
+        <div class="r"><label>实际驻留人数</label><input type="number" id="cVal" min="0" max="10000" value="${Math.max(0, raw + (DEVICE.calib ? DEVICE.calib.offset : 0))}" style="width:120px">
+          <span style="font-size:12px;color:var(--ink-3)">0 ~ 10000</span></div>
+        <div class="r"><label>校准人数（偏移量）</label><span id="cOff">${DEVICE.calib ? (DEVICE.calib.offset>0?"+":"") + DEVICE.calib.offset : "0"}</span></div>
+      </div>
+      <div class="note" style="margin-top:14px">校准后空间驻留人数 =（累计进入人次 − 累计离开人次）+ 校准人数，最小值为 0 不可为负。偏移量 = 用户手动输入的驻留人数 − 设备上报的最新驻留人数，支持正数、负数。切换工作模式后校准配置清空；校准只影响本次操作之后的实时驻留计算，不回溯修改历史报表数据。</div>
+    </div>
+    <div class="foot"><button class="btn ghost" id="cClear">清除校准</button><button class="btn ghost" id="cCancel">取消</button><button class="btn" id="cSave">保存校准</button></div>
+  </div>`;
+  document.body.appendChild(mask);
+  const input = mask.querySelector("#cVal"), offEl = mask.querySelector("#cOff");
+  const upd = () => { const v = Number(input.value); offEl.textContent = isNaN(v) ? "" : ((v - raw > 0 ? "+" : "") + (v - raw)); };
+  input.oninput = upd; upd();
+  mask.querySelector("#cCancel").onclick = () => mask.remove();
+  mask.querySelector("#cClear").onclick = () => { DEVICE.calib = null; mask.remove(); render(); };
+  mask.querySelector("#cSave").onclick = () => {
+    const v = Number(input.value);
+    if(isNaN(v) || v < 0 || v > 10000){ alert("用户输入的实际驻留人数范围限制：0~10000"); return; }
+    DEVICE.calib = { offset: v - raw, input: v, atMin: cov };
+    DEVICE.prompted = true;
+    mask.remove(); render();
+  };
+}
+/* =========================================================
+ * 区域配置页（仿 Studio 设备详情 · 区域配置）
+ * 看板「进出口配置」跳转至此；保存后监测区域与进出口区域同步回数据看板
+ * ========================================================= */
+const ZONE_TYPES = ["监测区域","干扰区域","进出口区域","边缘区域","跌倒屏蔽区域"];
+const ZONE_COLORS = ["#5B6EF7","#3ECFA0","#F5A623","#4FB6F0","#F77291","#8ED8F8","#9BD27A","#F7A6C0","#7B8CFF"];
+const GRID = { rows:14, cols:12 };
+let ZD = null;                                   // 配置页草稿状态
+
+function ensureZones(dev){
+  if(dev.zoneModel) return dev.zoneModel;
+  const rows = GRID.rows, cols = GRID.cols;
+  const zones = []; let id = 1;
+  const nb = dev.regions.length, usable = rows - 1;   // 末行留给边缘区域
+  dev.regions.forEach((name, i) => {
+    const z = { id:id++, name, type:"监测区域", color: ZONE_COLORS[i % ZONE_COLORS.length], cells:[] };
+    const r0 = Math.floor(usable * i / nb), r1 = Math.floor(usable * (i + 1) / nb);
+    for(let r = r0; r < r1; r++) for(let c = 0; c < cols - 2; c++) z.cells.push(r + "," + c);
+    zones.push(z);
+  });
+  const edge = { id:id++, name:"边缘区域", type:"边缘区域", color:"#C9CCD6", cells:[] };
+  for(let c = 0; c < cols; c++) edge.cells.push((rows - 1) + "," + c);
+  zones.push(edge);
+  if(dev.state.mode === "entrance"){
+    const ent = { id:id++, name: dev.entryZone ? dev.entryZone.name : "进出口", type:"进出口区域", color:"#5B6EF7", cells:[] };
+    [[0,cols-2],[0,cols-1],[1,cols-2],[1,cols-1],[4,cols-2],[4,cols-1],[5,cols-2],[5,cols-1]]
+      .forEach(p => ent.cells.push(p.join(",")));
+    zones.push(ent);
+  }
+  dev.zoneModel = { zones, nextId: id };
+  return dev.zoneModel;
+}
+function countBlocks(cells){
+  const set = new Set(cells), seen = new Set();
+  let n = 0;
+  set.forEach(k => {
+    if(seen.has(k)) return;
+    n++; const stack = [k]; seen.add(k);
+    while(stack.length){
+      const [r,c] = stack.pop().split(",").map(Number);
+      [[r-1,c],[r+1,c],[r,c-1],[r,c+1]].forEach(p => {
+        const key = p[0] + "," + p[1];
+        if(set.has(key) && !seen.has(key)){ seen.add(key); stack.push(key); }
+      });
+    }
+  });
+  return n;
+}
+function renderZoneConfig(){
+  renderHeader();
+  crumb.innerHTML = `<a href="#/">${DEVICE_NAME}</a><span class="sep">/</span><a href="#/">数据统计</a><span class="sep">/</span><span>区域配置</span>`;
+  const model = ensureZones(CUR);
+  if(!ZD || ZD.devId !== CUR.id){
+    ZD = { devId: CUR.id, draft: JSON.parse(JSON.stringify(model.zones)), nextId: model.nextId,
+           sel: (model.zones.find(z => z.type === "进出口区域") || model.zones[0]).id, dirty:false };
+  }
+  const sel = ZD.draft.find(z => z.id === ZD.sel) || ZD.draft[0];
+  ZD.sel = sel ? sel.id : null;
+  const owner = {};
+  ZD.draft.forEach(z => z.cells.forEach(c => owner[c] = z));
+  const entrance = CUR.state.mode === "entrance";
+  app.innerHTML = `
+    <div class="zcfg-head">
+      <div>
+        <div class="page-title">区域配置</div>
+        <div class="page-sub">${DEVICE_NAME} · ${entrance ? "进出口人流统计模式" : "存在监测模式"}；进出口区域仅支持 1 个，可在地图上圈选不连续的多块网格，保存后同步至数据看板</div>
+      </div>
+      <div class="zcfg-actions">
+        <span class="dirty-tip ${ZD.dirty?"show":""}">有未保存的修改</span>
+        <button class="btn ghost" id="zCancel">放弃修改</button>
+        <button class="btn" id="zSave">保存并返回数据看板</button>
+      </div>
+    </div>
+    <div class="zcfg-dev">
+      <span class="zico"></span>
+      <div>
+        <div class="zname">${DEVICE_NAME}</div>
+        <div class="zmeta">状态：<em class="${deviceOfflineNow()?"off":""}">${deviceOfflineNow()?"离线":"在线"}</em>
+          · 关联设备：Edge Hub · 区域数量：${ZD.draft.length} 个 · 网格：${GRID.rows} × ${GRID.cols}</div>
+      </div>
+      <a class="back-btn" href="#/" style="margin-left:auto">← 返回数据看板</a>
+    </div>
+    <div class="zcfg-tabs"><span>功能点</span><span class="on">区域配置</span></div>
+    <div class="zcfg-body">
+      <div class="zmap">
+        <div class="zmap-grid" id="zGrid">
+          ${Array.from({length: GRID.rows * GRID.cols}, (_, i) => {
+            const r = Math.floor(i / GRID.cols), c = i % GRID.cols, key = r + "," + c;
+            const z = owner[key];
+            return `<div class="zcell ${z?"fill":""} ${sel && z && z.id===sel.id?"mine":""}" data-k="${key}"
+              style="${z?`background:${z.color}${z.type==="边缘区域"?"55":"33"}`:""}">${
+              z && z.cells[0] === key ? `<span class="zlabel" style="color:${z.color}">${z.name}</span>` : ""}</div>`;
+          }).join("")}
+        </div>
+        <div class="note">点击网格即可将格子划入 / 移出左侧选中的区域；进出口区域可由多块不连续网格组成。</div>
+      </div>
+      <div class="zlist">
+        <div class="zlist-head">区域列表 <span>${ZD.draft.length} 个区域</span></div>
+        ${ZD.draft.map(z => `
+          <div class="zcard ${z.id===ZD.sel?"on":""}" data-id="${z.id}">
+            <div><div class="zn">${z.name || "未命名区域"}</div><div class="zt">${z.type}</div></div>
+            <span class="zdot" style="background:${z.color}"></span>
+          </div>`).join("")}
+        <button class="btn ghost" id="zAdd" style="margin-top:10px">+ 新建区域</button>
+      </div>
+      <div class="zdetail">
+        <div class="zlist-head">区域详情 <span>ID ${sel ? sel.id : "—"}</span></div>
+        ${sel ? `
+        <div class="zfield"><label>区域类型</label>
+          <select id="zType">${ZONE_TYPES.map(t => `<option ${t===sel.type?"selected":""}>${t}</option>`).join("")}</select>
+          ${sel.type === "进出口区域" ? '<div class="zhint">进出口逻辑仅允许设置 1 个区域</div>' : ""}
+        </div>
+        <div class="zfield"><label>区域名称</label><input type="text" id="zName" value="${sel.name}" maxlength="12"></div>
+        <div class="zfield"><label>已选网格</label>
+          <div class="zcount"><strong>${sel.cells.length}</strong> 当前已选择网格${sel.cells.length ? ` · ${countBlocks(sel.cells)} 块不连续区域` : ""}</div>
+        </div>
+        <div class="zbtns"><button class="btn ghost" id="zClear">清空网格</button><button class="btn danger" id="zDel">删除区域</button></div>
+        ${sel.type === "进出口区域" ? `<div class="zbtns"><button class="btn ghost" id="zUnset">清除进出口配置（看板将显示 “—”）</button></div>` : ""}
+        ` : '<div class="empty" style="border:none">暂无区域，请点击「+ 新建区域」</div>'}
+        <div class="note">工作模式在设备功能页切换：切换为进出口人流统计模式后需先设置进出口区域才生效，其他监测功能点将不再显示、相关自动化失效。</div>
+      </div>
+    </div>`;
+
+  document.getElementById("zGrid").addEventListener("click", e => {
+    const cell = e.target.closest(".zcell"); if(!cell || !sel) return;
+    const k = cell.dataset.k;
+    const other = ZD.draft.find(z => z.cells.indexOf(k) >= 0);
+    if(other && other.id === sel.id) sel.cells.splice(sel.cells.indexOf(k), 1);
+    else { if(other) other.cells.splice(other.cells.indexOf(k), 1); sel.cells.push(k); }
+    ZD.dirty = true; renderZoneConfig();
+  });
+  document.querySelector(".zlist").addEventListener("click", e => {
+    const c = e.target.closest(".zcard"); if(!c) return;
+    ZD.sel = Number(c.dataset.id); renderZoneConfig();
+  });
+  document.getElementById("zAdd").onclick = () => {
+    ZD.draft.push({ id: ZD.nextId++, name: "区域" + (ZD.draft.length + 1), type:"监测区域",
+      color: ZONE_COLORS[ZD.draft.length % ZONE_COLORS.length], cells:[] });
+    ZD.sel = ZD.draft[ZD.draft.length-1].id; ZD.dirty = true; renderZoneConfig();
+  };
+  document.getElementById("zType").onchange = e => {
+    const t = e.target.value;
+    if(t === "进出口区域" && ZD.draft.some(z => z.type === "进出口区域" && z.id !== sel.id)){
+      alert("仅允许设置 1 个进出口区域"); return;
+    }
+    sel.type = t; ZD.dirty = true; renderZoneConfig();
+  };
+  document.getElementById("zName").oninput = e => { sel.name = e.target.value; ZD.dirty = true; };
+  document.getElementById("zName").onchange = () => renderZoneConfig();
+  document.getElementById("zClear").onclick = () => { sel.cells = []; ZD.dirty = true; renderZoneConfig(); };
+  document.getElementById("zDel").onclick = () => {
+    ZD.draft = ZD.draft.filter(z => z.id !== sel.id);
+    ZD.sel = ZD.draft.length ? ZD.draft[0].id : null; ZD.dirty = true; renderZoneConfig();
+  };
+  const unbtn = document.getElementById("zUnset");
+  if(unbtn) unbtn.onclick = () => {
+    CUR.entryZone = null; CUR.state.zonePrompted = false;
+    ZD.dirty = true; renderZoneConfig();
+    toast("已清除进出口配置，数据看板将显示 “—”");
+  };
+  document.getElementById("zCancel").onclick = () => { ZD = null; location.hash = "#/"; };
+  document.getElementById("zSave").onclick = saveZones;
+}
+function saveZones(){
+  const draft = ZD.draft;
+  const names = draft.filter(z => z.type === "监测区域").map(z => (z.name || "").trim());
+  if(!names.length){ alert("至少需要 1 个监测区域"); return; }
+  if(new Set(names).size !== names.length){ alert("监测区域名称不可重复"); return; }
+  if(draft.some(z => !z.name || !z.name.trim())){ alert("区域名称不可为空"); return; }
+  if(CUR.state.mode === "entrance" && !draft.some(z => z.type === "进出口区域" && z.cells.length)){
+    alert("进出口人流统计模式需先设置进出口区域才生效"); return;
+  }
+  const ent = draft.find(z => z.type === "进出口区域");
+  /* 进出口就是一个区域名称（仅 1 个），看板只同步名称，不展示网格细节 */
+  CUR.entryZone = ent ? { name: ent.name.trim() } : null;
+  CUR.state.zonePrompted = false;
+  CUR.regions = names;
+  CUR.zoneModel = { zones: JSON.parse(JSON.stringify(draft)), nextId: ZD.nextId };
+  ZD = null;
+  genData();                                   // 区域变更后按新配置重新统计
+  useDevice(CUR.id);
+  location.hash = DEVICE.mode === "entrance" ? "#/entrance" : "#/";
+  toast("区域配置已保存，数据看板已同步");
+}
+function toast(msg){
+  const el = document.createElement("div");
+  el.className = "toast"; el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add("on"), 20);
+  setTimeout(() => { el.classList.remove("on"); setTimeout(() => el.remove(), 260); }, 2400);
+}
+
+/* ---------- 刷新 / 启动 ---------- */
+document.getElementById("refreshBtn").onclick = () => { genData(); render(); };
+genData();
 render();
 </script>
 </body>
